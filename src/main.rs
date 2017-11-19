@@ -95,7 +95,7 @@ fn main() {
         Ok(result) => result
     };
 
-    let mut lexer = Lexer::new(&mut file_contents);
+    let mut lexer = Lexer::new(&file_contents, file_string_path.to_str().unwrap().to_string());
 
     loop {
         let token = lexer.get_next_token();

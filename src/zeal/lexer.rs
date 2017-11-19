@@ -22,13 +22,13 @@ pub struct Lexer<'a> {
     column: u32,
 }
 
-impl<'a>  Lexer<'a> {
-    pub fn new(file_content: &str) -> Lexer {
+impl<'a> Lexer<'a> {
+    pub fn new(file_content: &str, source_file: String) -> Lexer {
         Lexer {
-            line: 0,
+            line: 1,
             column: 0,
             it: file_content.chars().peekable(),
-            source_file: String::from("")
+            source_file: source_file
         }
     }
 
@@ -110,7 +110,7 @@ impl<'a>  Lexer<'a> {
         Token {
             ttype: TokenType::Invalid(invalid_char),
             line: self.line,
-            start_column: self.column,
+            start_column: self.column - 1,
             end_column: self.column,
             source_file: self.source_file.to_string()
         }
