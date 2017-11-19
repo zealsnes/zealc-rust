@@ -11,7 +11,9 @@ use std::io::prelude::*;
 
 use snes_cpu::*;
 use zeal::lexer::*;
+use zeal::parser::*;
 use zeal::system_definition::SystemDefinition;
+use zeal::output_writer::*;
 
 static SUPPORTED_SYSTEMS: &'static [&'static SystemDefinition] = &[
     &SNES_CPU
@@ -26,16 +28,27 @@ fn absolute_path(path: &Path) -> std::io::Result<PathBuf> {
     Ok(path_buf)
 }
 
+fn find_system(cpu_name: &str) -> &'static SystemDefinition {
+    for system in SUPPORTED_SYSTEMS.iter() {
+        if system.short_name == cpu_name {
+            return system
+        }
+    }
+
+    &SNES_CPU
+}
+
 fn main() {
     let zeal_args_info = App::new("Zeal Compiler")
         .version("0.1.0")
         .author("Michaël Larouche <michael.larouche@gmail.com>")
-        .about("Compiler/Assembler for SNES/SFC 65816")
+        .about("Compiler/Assembler for SNES/SFC 65816 (for now)")
         .arg(
             Arg::with_name("output")
                 .short("o")
                 .long("output")
                 .takes_value(true)
+                .required(true)
                 .help("Resultant ROM file or an existing rom file"),
         )
         .arg(
@@ -47,7 +60,7 @@ fn main() {
             Arg::with_name("cpu")
                 .short("c")
                 .long("cpu")
-                .help("CPU type to use.")
+                .help("CPU type to use. (Default: snes-cpu)")
                 .takes_value(true),
         )
         .arg(
@@ -76,10 +89,19 @@ fn main() {
         Some(result) => result
     };
 
+    let output_path = match cmd_matches.value_of("output") {
+        None => {
+            println!("ERROR: No output file found!\n");
+            println!("{}", cmd_matches.usage());
+            std::process::exit(0);
+        },
+        Some(result) => Path::new(result)
+    };
+
     let input_path = Path::new(input_file);
     let path_display = input_path.display();
 
-    let mut file = match File::open(Path::new(input_file)) {
+    let mut file = match File::open(input_path) {
         Err(why) => panic!("Couldn't open {}: {}", path_display, why.description()),
         Ok(file) => file,
     };
@@ -95,17 +117,23 @@ fn main() {
         Ok(result) => result
     };
 
-    let mut lexer = Lexer::new(&file_contents, file_string_path.to_str().unwrap().to_string());
+    let selected_cpu = match cmd_matches.value_of("cpu") {
+        None => &SNES_CPU,
+        Some(cpu_name) => find_system(cpu_name)
+    };
 
-    loop {
-        let token = lexer.get_next_token();
-        match token.ttype {
-            TokenType::Invalid(invalid_char) => println!("Invalid token '{}' found in {} at line {} column {}", invalid_char, token.source_file, token.line, token.start_column),
-            TokenType::Identifier(identifier) => println!("Identifier: {}", identifier),
-            TokenType::EndOfFile => {
-                println!("Done!");
-                break;
-            }
+    let lexer = Lexer::new(&file_contents, file_string_path.to_str().unwrap().to_string());
+
+    let mut parser = Parser::new(lexer, selected_cpu);
+
+    let parse_tree = parser.parse_tree();
+
+    for expression in parse_tree.iter() {
+        match expression {
+            &Expression::CpuInstruction(instruction) => println!("{} = 0x{:x}", instruction.name, instruction.opcode)
         }
     }
+
+    let mut output_writer = OutputWriter::new(&parse_tree, output_path);
+    output_writer.write();
 }
