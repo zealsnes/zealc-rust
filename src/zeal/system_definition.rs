@@ -33,5 +33,6 @@ pub struct InstructionInfo {
 pub struct SystemDefinition {
     pub short_name: &'static str,
     pub name: &'static str,
+    pub is_big_endian: bool,
     pub instructions: &'static [InstructionInfo]
 }

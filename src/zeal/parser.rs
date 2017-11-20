@@ -1,26 +1,28 @@
 use zeal::lexer::*;
 use zeal::system_definition::*;
 
-pub enum Expression
-{
-    CpuInstruction(&'static InstructionInfo)
+pub enum LiteralExpression {
+    NumberLiteralExpression(NumberLiteral),
 }
 
-pub struct Parser<'a>
-{
+pub enum Expression {
+    ImpliedInstruction(&'static InstructionInfo),
+    SingleArgumentInstruction(&'static InstructionInfo, LiteralExpression),
+}
+
+pub struct Parser<'a> {
     lexers: Vec<Lexer<'a>>,
-    system: &'static SystemDefinition
+    system: &'static SystemDefinition,
 }
 
-impl<'a> Parser<'a>
-{
-    pub fn new(lexer: Lexer<'a>, system: &'static SystemDefinition) -> Self {
+impl<'a> Parser<'a> {
+    pub fn new(system: &'static SystemDefinition, lexer: Lexer<'a>) -> Self {
         let mut lexers = Vec::new();
         lexers.push(lexer);
 
         Parser {
             lexers: lexers,
-            system: system
+            system: system,
         }
     }
 
@@ -30,7 +32,7 @@ impl<'a> Parser<'a>
         loop {
             match self.parse() {
                 Some(expression) => expressions.push(expression),
-                None => break
+                None => break,
             }
         }
 
@@ -43,18 +45,19 @@ impl<'a> Parser<'a>
         match token.ttype {
             TokenType::Invalid(_) => return None,
             TokenType::EndOfFile => return None,
-            TokenType::Identifier(ident) => self.parse_cpu_instruction(ident)
+            TokenType::Identifier(ident) => self.parse_cpu_instruction(ident),
+            _ => return None,
         }
     }
 
     fn parse_cpu_instruction(&mut self, ident: String) -> Option<Expression> {
         for instruction in self.system.instructions.iter() {
             if instruction.name == ident {
-                return Some(Expression::CpuInstruction(instruction));
+                return Some(Expression::ImpliedInstruction(instruction));
             }
         }
 
-        return None
+        return None;
     }
 
     fn get_next_token(&mut self) -> Token {

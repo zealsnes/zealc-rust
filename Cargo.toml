@@ -5,3 +5,4 @@ authors = ["Michael Larouche <michael.larouche@gmail.com>"]
 
 [dependencies]
 clap = "2"
+byteorder = "1.1.0"

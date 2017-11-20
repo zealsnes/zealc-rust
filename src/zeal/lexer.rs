@@ -1,9 +1,23 @@
 use std::str::Chars;
 use std::iter::Peekable;
 
+pub enum ArgumentSize {
+    Word8,
+    Word16,
+    Word24,
+    Word32,
+}
+
+pub struct NumberLiteral {
+    pub number: u32,
+    pub argument_size: ArgumentSize
+}
+
 pub enum TokenType {
     Invalid(char),
     Identifier(String),
+    NumberLiteral(NumberLiteral),
+    Immediate,
     EndOfFile,
 }
 
@@ -12,7 +26,7 @@ pub struct Token {
     pub line: u32,
     pub start_column: u32,
     pub end_column: u32,
-    pub source_file: String
+    pub source_file: String,
 }
 
 pub struct Lexer<'a> {
@@ -22,13 +36,29 @@ pub struct Lexer<'a> {
     column: u32,
 }
 
+fn is_ascii_numeric(current_char: char) -> bool {
+         (current_char >= '0' && current_char <= '9')
+    }
+
+fn is_ascii_hexdigit(current_char: char) -> bool {
+    is_ascii_numeric(current_char)
+    || (current_char >= 'a' && current_char <= 'f')
+    || (current_char >= 'A' && current_char <= 'F')
+}
+
+fn is_ascii_alphanumeric(current_char: char) -> bool {
+    is_ascii_numeric(current_char)
+    || (current_char >= 'A' && current_char <= 'Z')
+    || (current_char >= 'a' && current_char <= 'z')
+}
+
 impl<'a> Lexer<'a> {
     pub fn new(file_content: &str, source_file: String) -> Lexer {
         Lexer {
             line: 1,
             column: 0,
             it: file_content.chars().peekable(),
-            source_file: source_file
+            source_file: source_file,
         }
     }
 
@@ -37,17 +67,30 @@ impl<'a> Lexer<'a> {
 
         match self.peek() {
             None => self.token_eof(),
-            Some(&current_char) => self.parse_token(current_char)
+            Some(&current_char) => self.parse_token(current_char),
         }
     }
 
     fn parse_token(&mut self, current_char: char) -> Token {
         match current_char {
-                'a'...'z' | 'A'...'Z' | '_' => {
-                        return self.parse_identifier_or_keyword();
-                    },
-                _ => return self.token_invalid()
+            'a'...'z' | 'A'...'Z' | '_' => {
+                return self.parse_identifier_or_keyword();
+            },
+            '#' => {
+                let start_column = self.column;
+                self.consume();
+                let end_column = self.column;
+                return self.new_token(TokenType::Immediate, start_column, end_column);
+            },
+            _ => {
+                if is_ascii_numeric(current_char) {
+                    return self.parse_number();
+                }
+                else {
+                    return self.token_invalid();
+                }
             }
+        }
     }
 
     fn eat_whitespaces(&mut self) {
@@ -75,7 +118,7 @@ impl<'a> Lexer<'a> {
             match self.peek() {
                 None => break,
                 Some(&current_char) => {
-                    if self.is_ascii_alphanumeric(current_char) || current_char == '_' {
+                    if is_ascii_alphanumeric(current_char) || current_char == '_' {
                         parsed_identifier.push(self.consume().unwrap())
                     } else {
                         break;
@@ -91,45 +134,87 @@ impl<'a> Lexer<'a> {
             line: self.line,
             start_column: start_column,
             end_column: end_column,
-            source_file: self.source_file.to_string()
+            source_file: self.source_file.to_string(),
         };
     }
 
-     fn is_ascii_alphanumeric(&self, current_char: char) -> bool {
-        (current_char >= '0' && current_char <= '9')
-        || (current_char >= 'A' && current_char <= 'Z')
-        || (current_char >= 'a' && current_char <= 'z')
+    fn parse_number(&mut self) -> Token {
+        let start_column = self.column;
+        let mut parsed_number = String::new();
+
+        parsed_number.push(self.consume().unwrap());
+
+        loop {
+            match self.peek() {
+                None => break,
+                Some(&current_char) => {
+                    if is_ascii_numeric(current_char) {
+                        parsed_number.push(self.consume().unwrap())
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+
+        let end_column = self.column;
+
+        let result_number = match u32::from_str_radix(&parsed_number, 10) {
+            Ok(result) => result,
+            Err(_) => 0
+        };
+
+        let argument_size = if result_number > 16777215 {
+            ArgumentSize::Word32
+        } else if result_number > u16::max_value() as u32 {
+            ArgumentSize::Word24
+        } else if result_number > u8::max_value() as u32 {
+            ArgumentSize::Word16
+        } else {
+            ArgumentSize::Word8
+        };
+
+        let number_literal = NumberLiteral {
+            number: result_number,
+            argument_size: argument_size
+        };
+
+        self.new_token(TokenType::NumberLiteral(number_literal), start_column, end_column)
     }
 
     fn token_invalid(&mut self) -> Token {
         let invalid_char = match self.consume() {
             Some(result) => result,
-            None => ' '
+            None => ' ',
         };
 
-        Token {
-            ttype: TokenType::Invalid(invalid_char),
-            line: self.line,
-            start_column: self.column - 1,
-            end_column: self.column,
-            source_file: self.source_file.to_string()
-        }
+        let start_column = self.column - 1;
+        let end_column = self.column;
+
+        self.new_token(TokenType::Invalid(invalid_char), start_column, end_column)
     }
 
     fn token_eof(&mut self) -> Token {
+        let start_column = self.column;
+        let end_column = self.column;
+
+        self.new_token(TokenType::EndOfFile, start_column, end_column)
+    }
+
+    fn new_token(&mut self, ttype: TokenType, start_column: u32, end_column: u32) -> Token {
         Token {
-            ttype: TokenType::EndOfFile,
+            ttype: ttype,
             line: self.line,
-            start_column: self.column,
-            end_column: self.column,
-            source_file: self.source_file.to_string()
+            start_column: start_column,
+            end_column: end_column,
+            source_file: self.source_file.to_string(),
         }
     }
 
     fn peek(&mut self) -> Option<&char> {
         match self.it.peek() {
             None => None,
-            Some(result) => Some(result)
+            Some(result) => Some(result),
         }
     }
 
