@@ -1,3 +1,3 @@
 clc
 cld
-lda 123
+lda #123

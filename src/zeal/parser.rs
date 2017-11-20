@@ -40,7 +40,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse(&mut self) -> Option<Expression> {
-        // root = (cpuInstruction)* ;
+        // root : (cpuInstruction)* ;
         let token = self.get_next_token();
         match token.ttype {
             TokenType::Invalid(_) => return None,
@@ -51,9 +51,30 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_cpu_instruction(&mut self, ident: String) -> Option<Expression> {
+        // cpuInstruction : IDENTIFIER ('#'? literal)? ;
+        let lookahead = self.lexer().unwrap().lookahead();
+
         for instruction in self.system.instructions.iter() {
             if instruction.name == ident {
-                return Some(Expression::ImpliedInstruction(instruction));
+                match lookahead.ttype {
+                    TokenType::Immediate => {
+                        if instruction.addressing == AddressingMode::Immediate {
+                            self.get_next_token(); // Eat Immediate token
+                            let number_literal_token = self.get_next_token();
+
+                            match number_literal_token.ttype {
+                                TokenType::NumberLiteral(number) => return Some(Expression::SingleArgumentInstruction(instruction, LiteralExpression::NumberLiteralExpression(number))),
+                                _ => continue
+                            }
+                        }
+                    },
+                    TokenType::NumberLiteral(literal) => {
+                        unimplemented!();
+                    }
+                    _ => {
+                        return Some(Expression::ImpliedInstruction(instruction));
+                    }
+                }
             }
         }
 

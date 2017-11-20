@@ -8,5 +8,7 @@ pub static SNES_CPU: SystemDefinition = SystemDefinition {
         InstructionInfo { name: "clc", addressing: AddressingMode::Implied, opcode: 0x18 },
         InstructionInfo { name: "cld", addressing: AddressingMode::Implied, opcode: 0xD8 },
         InstructionInfo { name: "cli", addressing: AddressingMode::Implied, opcode: 0x58 },
+        InstructionInfo { name: "lda", addressing: AddressingMode::Immediate, opcode: 0xA9 },
+        InstructionInfo { name: "lda", addressing: AddressingMode::Direct, opcode: 0xA5 }
     ],
 };

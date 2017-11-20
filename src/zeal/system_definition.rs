@@ -1,3 +1,4 @@
+#[derive(PartialEq)]
 pub enum AddressingMode {
     Implied,
     Immediate,

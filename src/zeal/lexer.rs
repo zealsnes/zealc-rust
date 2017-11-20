@@ -71,6 +71,20 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    pub fn lookahead(&mut self) -> Token {
+        let backup_line = self.line;
+        let backup_column = self.column;
+        let backup_it = self.it.clone();
+
+        let lookahead = self.get_next_token();
+
+        self.line = backup_line;
+        self.column = backup_column;
+        self.it = backup_it;
+
+        return lookahead;
+    }
+
     fn parse_token(&mut self, current_char: char) -> Token {
         match current_char {
             'a'...'z' | 'A'...'Z' | '_' => {
