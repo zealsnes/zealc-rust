@@ -43,10 +43,14 @@ pub struct Lexer<'a> {
 }
 
 fn is_ascii_numeric(current_char: char) -> bool {
-         (current_char >= '0' && current_char <= '9')
-    }
+    current_char >= '0' && current_char <= '9'
+}
 
-fn is_ascii_hexdigit(current_char: char) -> bool {
+fn is_ascii_binary_digit(current_char: char) -> bool {
+    current_char == '0' || current_char == '1'
+}
+
+fn is_ascii_hex_digit(current_char: char) -> bool {
     is_ascii_numeric(current_char)
     || (current_char >= 'a' && current_char <= 'f')
     || (current_char >= 'A' && current_char <= 'F')
@@ -102,6 +106,12 @@ impl<'a> Lexer<'a> {
                 self.consume();
                 let end_column = self.column;
                 return self.new_token(TokenType::Immediate, start_column, end_column);
+            },
+            '$' => {
+                return self.parse_hex_number();
+            },
+            '%' => {
+                return self.parse_binary_number();
             },
             _ => {
                 if is_ascii_numeric(current_char) {
@@ -167,6 +177,102 @@ impl<'a> Lexer<'a> {
                 source_file: self.source_file.to_string(),
             };
         }
+    }
+
+    fn parse_hex_number(&mut self) -> Token {
+        let start_column = self.column;
+
+        // Eat $
+        self.consume();
+
+        let mut parsed_number = String::new();
+
+        loop {
+            match self.peek() {
+                None => break,
+                Some(&current_char) => {
+                    if is_ascii_hex_digit(current_char) {
+                        parsed_number.push(self.consume().unwrap())
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+
+        let end_column = self.column;
+
+        let result_number = match u32::from_str_radix(&parsed_number, 16) {
+            Ok(result) => result,
+            Err(_) => 0
+        };
+
+        let parsed_length = parsed_number.len();
+
+        let argument_size = if parsed_length > 6 {
+            ArgumentSize::Word32
+        } else if parsed_length > 4 {
+            ArgumentSize::Word24
+        } else if parsed_length > 2 {
+            ArgumentSize::Word16
+        } else {
+            ArgumentSize::Word8
+        };
+
+        let number_literal = NumberLiteral {
+            number: result_number,
+            argument_size: argument_size
+        };
+
+        self.new_token(TokenType::NumberLiteral(number_literal), start_column, end_column)
+    }
+
+    fn parse_binary_number(&mut self) -> Token {
+        let start_column = self.column;
+
+        // Eat %
+        self.consume();
+
+        let mut parsed_number = String::new();
+
+        loop {
+            match self.peek() {
+                None => break,
+                Some(&current_char) => {
+                    if is_ascii_binary_digit(current_char) {
+                        parsed_number.push(self.consume().unwrap())
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+
+        let end_column = self.column;
+
+        let result_number = match u32::from_str_radix(&parsed_number, 2) {
+            Ok(result) => result,
+            Err(_) => 0
+        };
+
+        let parsed_length = parsed_number.len();
+
+        let argument_size = if parsed_length > 24 {
+            ArgumentSize::Word32
+        } else if parsed_length > 16 {
+            ArgumentSize::Word24
+        } else if parsed_length > 8 {
+            ArgumentSize::Word16
+        } else {
+            ArgumentSize::Word8
+        };
+
+        let number_literal = NumberLiteral {
+            number: result_number,
+            argument_size: argument_size
+        };
+
+        self.new_token(TokenType::NumberLiteral(number_literal), start_column, end_column)
     }
 
     fn parse_number(&mut self) -> Token {
