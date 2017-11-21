@@ -36,20 +36,18 @@ impl<'a> OutputWriter<'a> {
         for expression in self.parse_tree.iter() {
             match expression {
                 &Expression::ImpliedInstruction(instruction) => {
-                    let data = [instruction.opcode];
-                    self.output.write(&data).unwrap();
+                    self.output.write_u8(instruction.opcode).unwrap();
                 }
-                &Expression::SingleArgumentInstruction(instruction, ref literal) => {
-                    let data = [instruction.opcode];
-                    self.output.write(&data).unwrap();
+                &Expression::SingleArgumentInstruction(instruction, ref argument) => {
+                    self.output.write_u8(instruction.opcode).unwrap();
 
-                    match literal {
-                        &LiteralExpression::NumberLiteralExpression(ref number) => {
+                    match argument {
+                        &ArgumentExpression::NumberLiteralExpression(ref number) => {
                             self.write_number_literal(&number)
                         }
                     }
                 }
-            }
+            };
         }
     }
 

@@ -1,6 +1,7 @@
 use std::str::Chars;
 use std::iter::Peekable;
 
+#[derive(PartialEq, Copy, Clone)]
 pub enum ArgumentSize {
     Word8,
     Word16,
@@ -8,11 +9,13 @@ pub enum ArgumentSize {
     Word32,
 }
 
+#[derive(PartialEq, Copy, Clone)]
 pub struct NumberLiteral {
     pub number: u32,
     pub argument_size: ArgumentSize
 }
 
+#[derive(PartialEq)]
 pub enum TokenType {
     Invalid(char),
     Identifier(String),

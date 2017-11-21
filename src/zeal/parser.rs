@@ -1,13 +1,13 @@
 use zeal::lexer::*;
 use zeal::system_definition::*;
 
-pub enum LiteralExpression {
+pub enum ArgumentExpression {
     NumberLiteralExpression(NumberLiteral),
 }
 
 pub enum Expression {
     ImpliedInstruction(&'static InstructionInfo),
-    SingleArgumentInstruction(&'static InstructionInfo, LiteralExpression),
+    SingleArgumentInstruction(&'static InstructionInfo, ArgumentExpression),
 }
 
 pub struct Parser<'a> {
@@ -50,35 +50,82 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_cpu_instruction(&mut self, ident: String) -> Option<Expression> {
-        // cpuInstruction : IDENTIFIER ('#'? literal)? ;
-        let lookahead = self.lexer().unwrap().lookahead();
+    fn parse_cpu_instruction(&mut self, identifier: String) -> Option<Expression> {
+        // cpuInstruction : IDENTIFIER #Implied
+        //    | IDENTIFIER '#' argument #Immediate
+        //    | IDENTIFIER argument #SingleArgument
+        //    ;
+        let lookahead = self.lookahead();
 
-        for instruction in self.system.instructions.iter() {
-            if instruction.name == ident {
-                match lookahead.ttype {
-                    TokenType::Immediate => {
-                        if instruction.addressing == AddressingMode::Immediate {
-                            self.get_next_token(); // Eat Immediate token
-                            let number_literal_token = self.get_next_token();
+        let mut is_immediate = false;
+        if lookahead.ttype == TokenType::Immediate {
+            self.get_next_token();
+            is_immediate = true;
+        }
 
-                            match number_literal_token.ttype {
-                                TokenType::NumberLiteral(number) => return Some(Expression::SingleArgumentInstruction(instruction, LiteralExpression::NumberLiteralExpression(number))),
-                                _ => continue
-                            }
+        let argument = self.parse_argument();
+
+        match argument {
+            Some(result) => {
+                match result {
+                    ArgumentExpression::NumberLiteralExpression(number_literal) => {
+                        let possible_instruction = if is_immediate {
+                            self.find_suitable_instruction(&identifier, &[AddressingMode::Immediate])
+                        } else if number_literal.argument_size == ArgumentSize::Word24 {
+                            self.find_suitable_instruction(&identifier, &[AddressingMode::AbsoluteLong])
+                        } else if number_literal.argument_size == ArgumentSize::Word16 {
+                            self.find_suitable_instruction(&identifier, &[AddressingMode::Absolute, AddressingMode::RelativeLong])
+                        } else {
+                            self.find_suitable_instruction(&identifier, &[AddressingMode::Direct, AddressingMode::Relative])
+                        };
+
+                        match possible_instruction {
+                            Some(instruction) => return Some(Expression::SingleArgumentInstruction(instruction, result)),
+                            None => return None
                         }
-                    },
-                    TokenType::NumberLiteral(literal) => {
-                        unimplemented!();
                     }
-                    _ => {
-                        return Some(Expression::ImpliedInstruction(instruction));
+                }
+            },
+            None => {
+                let possible_instruction = self.find_suitable_instruction(&identifier, &[AddressingMode::Implied]);
+                match possible_instruction {
+                    Some(instruction) => return Some(Expression::ImpliedInstruction(instruction)),
+                    None => return None
+                }
+            }
+        };
+    }
+
+    fn parse_argument(&mut self) -> Option<ArgumentExpression> {
+        // argument : NUMBER_LITERAL ;
+        let lookahead = self.lookahead();
+        match lookahead.ttype {
+            TokenType::NumberLiteral(number_literal) => {
+                self.get_next_token(); // Eat token
+                Some(ArgumentExpression::NumberLiteralExpression(number_literal))
+            },
+            _ => {
+                None
+            }
+        }
+    }
+
+    fn find_suitable_instruction(&mut self, identifier: &str, possible_addressings: &[AddressingMode]) -> Option<&'static InstructionInfo> {
+        for instruction in self.system.instructions.iter() {
+            if instruction.name == identifier {
+                for addressing_mode in possible_addressings.iter() {
+                    if &instruction.addressing == addressing_mode {
+                        return Some(instruction)
                     }
                 }
             }
         }
 
-        return None;
+        return None
+    }
+
+    fn lookahead(&mut self) -> Token {
+        self.lexer().unwrap().lookahead()
     }
 
     fn get_next_token(&mut self) -> Token {
