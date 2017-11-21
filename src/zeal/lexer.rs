@@ -1,5 +1,6 @@
 use std::str::Chars;
 use std::iter::Peekable;
+use zeal::system_definition::*;
 
 #[derive(PartialEq, Copy, Clone)]
 pub enum ArgumentSize {
@@ -19,6 +20,7 @@ pub struct NumberLiteral {
 pub enum TokenType {
     Invalid(char),
     Identifier(String),
+    Opcode(String),
     NumberLiteral(NumberLiteral),
     Immediate,
     EndOfFile,
@@ -33,6 +35,7 @@ pub struct Token {
 }
 
 pub struct Lexer<'a> {
+    system: &'static SystemDefinition,
     it: Peekable<Chars<'a>>,
     source_file: String,
     line: u32,
@@ -56,12 +59,13 @@ fn is_ascii_alphanumeric(current_char: char) -> bool {
 }
 
 impl<'a> Lexer<'a> {
-    pub fn new(file_content: &str, source_file: String) -> Lexer {
-        Lexer {
-            line: 1,
-            column: 0,
+    pub fn new(system: &'static SystemDefinition, file_content: &'a str, source_file: String) -> Self {
+        Lexer{
+            system: system,
             it: file_content.chars().peekable(),
             source_file: source_file,
+            line: 1,
+            column: 1,
         }
     }
 
@@ -91,7 +95,7 @@ impl<'a> Lexer<'a> {
     fn parse_token(&mut self, current_char: char) -> Token {
         match current_char {
             'a'...'z' | 'A'...'Z' | '_' => {
-                return self.parse_identifier_or_keyword();
+                return self.parse_identifier_or_keyword_or_opcode();
             },
             '#' => {
                 let start_column = self.column;
@@ -114,7 +118,7 @@ impl<'a> Lexer<'a> {
         while let Some(&current_char) = self.peek() {
             if current_char == '\n' {
                 self.line += 1;
-                self.column = 0;
+                self.column = 1;
             }
 
             if !current_char.is_whitespace() {
@@ -125,7 +129,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn parse_identifier_or_keyword(&mut self) -> Token {
+    fn parse_identifier_or_keyword_or_opcode(&mut self) -> Token {
         let start_column = self.column;
         let mut parsed_identifier = String::new();
 
@@ -146,13 +150,23 @@ impl<'a> Lexer<'a> {
 
         let end_column = self.column;
 
-        return Token {
-            ttype: TokenType::Identifier(parsed_identifier),
-            line: self.line,
-            start_column: start_column,
-            end_column: end_column,
-            source_file: self.source_file.to_string(),
-        };
+        if self.is_opcode(&parsed_identifier) {
+            return Token {
+                ttype: TokenType::Opcode(parsed_identifier),
+                line: self.line,
+                start_column: start_column,
+                end_column: end_column,
+                source_file: self.source_file.to_string(),
+            };
+        } else {
+            return Token {
+                ttype: TokenType::Identifier(parsed_identifier),
+                line: self.line,
+                start_column: start_column,
+                end_column: end_column,
+                source_file: self.source_file.to_string(),
+            };
+        }
     }
 
     fn parse_number(&mut self) -> Token {
@@ -197,6 +211,16 @@ impl<'a> Lexer<'a> {
         };
 
         self.new_token(TokenType::NumberLiteral(number_literal), start_column, end_column)
+    }
+
+    fn is_opcode(&self, identifier: &str) -> bool {
+        for instruction in self.system.instructions.iter() {
+            if instruction.name == identifier {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     fn token_invalid(&mut self) -> Token {

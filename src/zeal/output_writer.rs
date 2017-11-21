@@ -3,7 +3,6 @@ extern crate byteorder;
 use self::byteorder::{BigEndian, LittleEndian, WriteBytesExt};
 use std::fs::File;
 use std::fs::OpenOptions;
-use std::io::Write;
 use std::path::Path;
 use zeal::lexer::*;
 use zeal::parser::*;

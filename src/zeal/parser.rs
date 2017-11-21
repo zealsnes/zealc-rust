@@ -45,15 +45,15 @@ impl<'a> Parser<'a> {
         match token.ttype {
             TokenType::Invalid(_) => return None,
             TokenType::EndOfFile => return None,
-            TokenType::Identifier(ident) => self.parse_cpu_instruction(ident),
+            TokenType::Opcode(opcode_name) => self.parse_cpu_instruction(opcode_name),
             _ => return None,
         }
     }
 
-    fn parse_cpu_instruction(&mut self, identifier: String) -> Option<Expression> {
-        // cpuInstruction : IDENTIFIER #Implied
-        //    | IDENTIFIER '#' argument #Immediate
-        //    | IDENTIFIER argument #SingleArgument
+    fn parse_cpu_instruction(&mut self, opcode_name: String) -> Option<Expression> {
+        // cpuInstruction : OPCODE #Implied
+        //    | OPCODE '#' argument #Immediate
+        //    | OPCODE argument #SingleArgument
         //    ;
         let lookahead = self.lookahead();
 
@@ -70,13 +70,13 @@ impl<'a> Parser<'a> {
                 match result {
                     ArgumentExpression::NumberLiteralExpression(number_literal) => {
                         let possible_instruction = if is_immediate {
-                            self.find_suitable_instruction(&identifier, &[AddressingMode::Immediate])
+                            self.find_suitable_instruction(&opcode_name, &[AddressingMode::Immediate])
                         } else if number_literal.argument_size == ArgumentSize::Word24 {
-                            self.find_suitable_instruction(&identifier, &[AddressingMode::AbsoluteLong])
+                            self.find_suitable_instruction(&opcode_name, &[AddressingMode::AbsoluteLong])
                         } else if number_literal.argument_size == ArgumentSize::Word16 {
-                            self.find_suitable_instruction(&identifier, &[AddressingMode::Absolute, AddressingMode::RelativeLong])
+                            self.find_suitable_instruction(&opcode_name, &[AddressingMode::Absolute, AddressingMode::RelativeLong])
                         } else {
-                            self.find_suitable_instruction(&identifier, &[AddressingMode::Direct, AddressingMode::Relative])
+                            self.find_suitable_instruction(&opcode_name, &[AddressingMode::Direct, AddressingMode::Relative])
                         };
 
                         match possible_instruction {
@@ -87,7 +87,7 @@ impl<'a> Parser<'a> {
                 }
             },
             None => {
-                let possible_instruction = self.find_suitable_instruction(&identifier, &[AddressingMode::Implied]);
+                let possible_instruction = self.find_suitable_instruction(&opcode_name, &[AddressingMode::Implied]);
                 match possible_instruction {
                     Some(instruction) => return Some(Expression::ImpliedInstruction(instruction)),
                     None => return None
@@ -110,9 +110,9 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn find_suitable_instruction(&mut self, identifier: &str, possible_addressings: &[AddressingMode]) -> Option<&'static InstructionInfo> {
+    fn find_suitable_instruction(&mut self, opcode_name: &str, possible_addressings: &[AddressingMode]) -> Option<&'static InstructionInfo> {
         for instruction in self.system.instructions.iter() {
-            if instruction.name == identifier {
+            if instruction.name == opcode_name {
                 for addressing_mode in possible_addressings.iter() {
                     if &instruction.addressing == addressing_mode {
                         return Some(instruction)

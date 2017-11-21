@@ -122,17 +122,11 @@ fn main() {
         Some(cpu_name) => find_system(cpu_name)
     };
 
-    let lexer = Lexer::new(&file_contents, file_string_path.to_str().unwrap().to_string());
+    let lexer = Lexer::new(selected_cpu, &file_contents, file_string_path.to_str().unwrap().to_string());
 
     let mut parser = Parser::new(selected_cpu, lexer);
 
     let parse_tree = parser.parse_tree();
-
-    // for expression in parse_tree.iter() {
-    //     match expression {
-    //         &Expression::CpuInstruction(instruction) => println!("{} = 0x{:x}", instruction.name, instruction.opcode)
-    //     }
-    // }
 
     let mut output_writer = OutputWriter::new(selected_cpu, &parse_tree, output_path);
     output_writer.write();
