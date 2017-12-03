@@ -1,0 +1,3 @@
+lda patate_pweill
+lda #345
+lda !123

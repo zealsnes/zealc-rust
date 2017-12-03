@@ -1,3 +1,5 @@
+use std::str::Chars;
+use std::iter::Peekable;
 use zeal::lexer::*;
 use zeal::system_definition::*;
 
@@ -10,9 +12,30 @@ pub enum Expression {
     SingleArgumentInstruction(&'static InstructionInfo, ArgumentExpression),
 }
 
+#[derive(PartialEq)]
+pub enum ErrorSeverity {
+    Error,
+    Warning
+}
+
+pub struct ErrorMessage<'a> {
+    pub message: String,
+    pub token: Token,
+    pub context_start: Peekable<Chars<'a>>,
+    pub severity: ErrorSeverity
+}
+
 pub struct Parser<'a> {
     lexers: Vec<Lexer<'a>>,
     system: &'static SystemDefinition,
+    pub error_messages: Vec<ErrorMessage<'a>>
+}
+
+enum ParseResult<T> {
+    None,
+    Done,
+    Error,
+    Some(T)
 }
 
 impl<'a> Parser<'a> {
@@ -23,7 +46,12 @@ impl<'a> Parser<'a> {
         Parser {
             lexers: lexers,
             system: system,
+            error_messages: Vec::new()
         }
+    }
+
+    pub fn has_errors(&self) -> bool {
+        return !self.error_messages.is_empty();
     }
 
     pub fn parse_tree(&mut self) -> Vec<Expression> {
@@ -31,26 +59,34 @@ impl<'a> Parser<'a> {
 
         loop {
             match self.parse() {
-                Some(expression) => expressions.push(expression),
-                None => break,
+                ParseResult::Some(expression) => expressions.push(expression),
+                ParseResult::None => continue,
+                ParseResult::Error => continue,
+                ParseResult::Done => break,
             }
         }
 
         return expressions;
     }
 
-    fn parse(&mut self) -> Option<Expression> {
+    fn parse(&mut self) -> ParseResult<Expression> {
         // root : (cpuInstruction)* ;
         let token = self.get_next_token();
         match token.ttype {
-            TokenType::Invalid(_) => return None,
-            TokenType::EndOfFile => return None,
+            TokenType::EndOfFile => return ParseResult::Done,
             TokenType::Opcode(opcode_name) => self.parse_cpu_instruction(opcode_name),
-            _ => return None,
+            TokenType::Invalid(invalid_token) => {
+                self.add_invalid_token_message(invalid_token, token);
+                return ParseResult::Error;
+            },
+             _ => {
+                self.add_error_message("unexpected token found.", token);
+                return ParseResult::Error
+            }
         }
     }
 
-    fn parse_cpu_instruction(&mut self, opcode_name: String) -> Option<Expression> {
+    fn parse_cpu_instruction(&mut self, opcode_name: String) -> ParseResult<Expression> {
         // cpuInstruction : OPCODE #Implied
         //    | OPCODE '#' argument #Immediate
         //    | OPCODE argument #SingleArgument
@@ -66,7 +102,7 @@ impl<'a> Parser<'a> {
         let argument = self.parse_argument();
 
         match argument {
-            Some(result) => {
+            ParseResult::Some(result) => {
                 match result {
                     ArgumentExpression::NumberLiteralExpression(number_literal) => {
                         let possible_instruction = if is_immediate {
@@ -80,32 +116,51 @@ impl<'a> Parser<'a> {
                         };
 
                         match possible_instruction {
-                            Some(instruction) => return Some(Expression::SingleArgumentInstruction(instruction, result)),
-                            None => return None
+                            Some(instruction) => return ParseResult::Some(Expression::SingleArgumentInstruction(instruction, result)),
+                            None => return ParseResult::Error
                         }
                     }
                 }
             },
-            None => {
+            ParseResult::None => {
                 let possible_instruction = self.find_suitable_instruction(&opcode_name, &[AddressingMode::Implied]);
                 match possible_instruction {
-                    Some(instruction) => return Some(Expression::ImpliedInstruction(instruction)),
-                    None => return None
+                    Some(instruction) => return ParseResult::Some(Expression::ImpliedInstruction(instruction)),
+                    None => return ParseResult::Error
                 }
+            },
+            ParseResult::Error => {
+                return ParseResult::Error
+            },
+            ParseResult::Done => {
+                return ParseResult::Done
             }
         };
     }
 
-    fn parse_argument(&mut self) -> Option<ArgumentExpression> {
+    fn parse_argument(&mut self) -> ParseResult<ArgumentExpression> {
         // argument : NUMBER_LITERAL ;
         let lookahead = self.lookahead();
         match lookahead.ttype {
             TokenType::NumberLiteral(number_literal) => {
                 self.get_next_token(); // Eat token
-                Some(ArgumentExpression::NumberLiteralExpression(number_literal))
+                ParseResult::Some(ArgumentExpression::NumberLiteralExpression(number_literal))
+            },
+            TokenType::Opcode(_) => {
+                ParseResult::None
+            },
+            TokenType::Invalid(invalid_token) => {
+                self.get_next_token(); // Eat token
+                self.add_invalid_token_message(invalid_token, lookahead);
+                ParseResult::Error
+            },
+            TokenType::EndOfFile => {
+                ParseResult::Done
             },
             _ => {
-                None
+                self.get_next_token(); // Eat token
+                self.add_error_message(&format!("A number litteral was expected here."), lookahead);
+                ParseResult::Error
             }
         }
     }
@@ -134,5 +189,20 @@ impl<'a> Parser<'a> {
 
     fn lexer(&mut self) -> Option<&mut Lexer<'a>> {
         self.lexers.last_mut()
+    }
+
+    fn add_error_message(&mut self, error_message: &str, offending_token: Token) {
+        let new_message = ErrorMessage {
+            message: error_message.to_owned(),
+            token: offending_token,
+            context_start: self.lexer().unwrap().start_line.clone(),
+            severity: ErrorSeverity::Error
+        };
+
+        self.error_messages.push(new_message);
+    }
+
+    fn add_invalid_token_message(&mut self, invalid_token: char, token: Token) {
+        self.add_error_message(&format!("Invalid token '{}' found.", invalid_token), token);
     }
 }

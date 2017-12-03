@@ -37,6 +37,7 @@ pub struct Token {
 pub struct Lexer<'a> {
     system: &'static SystemDefinition,
     it: Peekable<Chars<'a>>,
+    pub start_line: Peekable<Chars<'a>>,
     source_file: String,
     line: u32,
     column: u32,
@@ -68,6 +69,7 @@ impl<'a> Lexer<'a> {
             system: system,
             it: file_content.chars().peekable(),
             source_file: source_file,
+            start_line: file_content.chars().peekable(),
             line: 1,
             column: 1,
         }
@@ -128,14 +130,16 @@ impl<'a> Lexer<'a> {
         while let Some(&current_char) = self.peek() {
             if current_char == '\n' {
                 self.line += 1;
-                self.column = 1;
-            }
+                self.column = 0;
 
-            if !current_char.is_whitespace() {
+                self.consume();
+                self.start_line = self.it.clone();
+            }
+            else if !current_char.is_whitespace() {
                 break;
+            } else {
+                self.consume();
             }
-
-            self.consume();
         }
     }
 

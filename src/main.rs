@@ -38,6 +38,38 @@ fn find_system(cpu_name: &str) -> &'static SystemDefinition {
     &SNES_CPU
 }
 
+fn print_error_message(error_message: &ErrorMessage) {
+    let severity_string = match error_message.severity {
+        ErrorSeverity::Error => "error",
+        ErrorSeverity::Warning => "warning"
+    };
+
+    println!("{}({},{}): {}: {}", error_message.token.source_file,
+        error_message.token.line,
+        error_message.token.start_column,
+        severity_string,
+        error_message.message);
+
+    for context_char in error_message.context_start.clone() {
+        if context_char == '\n' {
+            break;
+        } else {
+            print!("{}", context_char);
+        }
+    }
+    println!("");
+
+    for _ in 0..(error_message.token.start_column-1) {
+        print!(" ");
+    }
+
+    for _ in error_message.token.start_column..error_message.token.end_column {
+        print!("^");
+    }
+
+    println!("");
+}
+
 fn main() {
     let zeal_args_info = App::new("Zeal Compiler")
         .version("0.1.0")
@@ -84,7 +116,7 @@ fn main() {
         None => {
             println!("ERROR: No input file found!\n");
             println!("{}", cmd_matches.usage());
-            std::process::exit(0);
+            std::process::exit(1);
         },
         Some(result) => result
     };
@@ -93,7 +125,7 @@ fn main() {
         None => {
             println!("ERROR: No output file found!\n");
             println!("{}", cmd_matches.usage());
-            std::process::exit(0);
+            std::process::exit(1);
         },
         Some(result) => Path::new(result)
     };
@@ -127,6 +159,18 @@ fn main() {
     let mut parser = Parser::new(selected_cpu, lexer);
 
     let parse_tree = parser.parse_tree();
+
+    if parser.has_errors() {
+        for error_message in &parser.error_messages {
+            print_error_message(&error_message);
+        }
+
+        for error_message in &parser.error_messages {
+            if error_message.severity == ErrorSeverity::Error {
+                std::process::exit(1);
+            }
+        }
+    }
 
     let mut output_writer = OutputWriter::new(selected_cpu, &parse_tree, output_path);
     output_writer.write();
