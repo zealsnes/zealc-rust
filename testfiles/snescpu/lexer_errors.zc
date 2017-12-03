@@ -1,3 +1,5 @@
+// Invalid argument
 lda patate_pweill
 lda #345
+// Invalid token
 lda !123

@@ -77,6 +77,7 @@ impl<'a> Lexer<'a> {
 
     pub fn get_next_token(&mut self) -> Token {
         self.eat_whitespaces();
+        self.eat_comment();
 
         match self.peek() {
             None => self.token_eof(),
@@ -129,17 +130,38 @@ impl<'a> Lexer<'a> {
     fn eat_whitespaces(&mut self) {
         while let Some(&current_char) = self.peek() {
             if current_char == '\n' {
-                self.line += 1;
-                self.column = 0;
-
-                self.consume();
-                self.start_line = self.it.clone();
+                self.do_end_of_line();
             }
             else if !current_char.is_whitespace() {
                 break;
             } else {
                 self.consume();
             }
+        }
+    }
+
+    fn eat_comment(&mut self) {
+        match self.peek() {
+            Some(&first_char) => {
+                if first_char == '/' {
+                    match self.peek_lookahead(1) {
+                        Some(second_char) => {
+                            if second_char == '/' {
+                                while let Some(&current_char) = self.peek() {
+                                    if current_char == '\n' {
+                                        self.do_end_of_line();
+                                        break;
+                                    } else {
+                                        self.consume();
+                                    }
+                                }
+                            }
+                        },
+                        None => return
+                    }
+                }
+            },
+            None => return
         }
     }
 
@@ -333,6 +355,14 @@ impl<'a> Lexer<'a> {
         return false;
     }
 
+    fn do_end_of_line(&mut self) {
+        self.line += 1;
+        self.column = 0;
+
+        self.consume();
+        self.start_line = self.it.clone();
+    }
+
     fn token_invalid(&mut self) -> Token {
         let invalid_char = match self.consume() {
             Some(result) => result,
@@ -366,6 +396,15 @@ impl<'a> Lexer<'a> {
         match self.it.peek() {
             None => None,
             Some(result) => Some(result),
+        }
+    }
+    
+    fn peek_lookahead(&mut self, lookahead: usize) -> Option<char> {
+        let mut skip_it = self.it.clone().skip(lookahead);
+
+        match skip_it.next() {
+            Some(result) => Some(result),
+            None => None
         }
     }
 

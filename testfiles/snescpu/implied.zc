@@ -1,6 +1,10 @@
+// Implied instructions
 clc
 cld
+// Immediate instructions
 lda #123
+lda #%10001000
+// Direct Page instructions
 lda 500
 lda $00Af
-lda #%10001000
+
