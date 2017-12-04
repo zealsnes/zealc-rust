@@ -147,27 +147,34 @@ impl<'a> Lexer<'a> {
     }
 
     fn eat_comment(&mut self) {
-        match self.peek() {
-            Some(&first_char) => {
-                if first_char == '/' {
-                    match self.peek_lookahead(1) {
-                        Some(second_char) => {
-                            if second_char == '/' {
-                                while let Some(&current_char) = self.peek() {
-                                    if current_char == '\n' {
-                                        self.do_end_of_line();
-                                        break;
-                                    } else {
-                                        self.consume();
+        let mut is_done = false;
+        while !is_done {
+            match self.peek() {
+                Some(&first_char) => {
+                    if first_char == '/' {
+                        match self.peek_lookahead(1) {
+                            Some(second_char) => {
+                                if second_char == '/' {
+                                    while let Some(&current_char) = self.peek() {
+                                        if current_char == '\n' {
+                                            self.do_end_of_line();
+                                            break;
+                                        } else {
+                                            self.consume();
+                                        }
                                     }
+                                } else {
+                                    is_done = true
                                 }
-                            }
-                        },
-                        None => return
+                            },
+                            None => is_done = true
+                        }
+                    } else {
+                        is_done = true
                     }
-                }
-            },
-            None => return
+                },
+                None => is_done = true
+            };
         }
     }
 
