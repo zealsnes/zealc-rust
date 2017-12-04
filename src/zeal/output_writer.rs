@@ -8,14 +8,13 @@ use zeal::lexer::*;
 use zeal::parser::*;
 use zeal::system_definition::*;
 
-pub struct OutputWriter<'a> {
-    parse_tree: &'a Vec<Expression>,
+pub struct OutputWriter {
     system: &'static SystemDefinition,
     output: File,
 }
 
-impl<'a> OutputWriter<'a> {
-    pub fn new(system: &'static SystemDefinition, parse_tree: &'a Vec<Expression>, file_path: &Path,) -> Self {
+impl<'a> OutputWriter {
+    pub fn new(system: &'static SystemDefinition, file_path: &Path) -> Self {
         let mut file_options = OpenOptions::new();
         file_options.write(true);
 
@@ -25,28 +24,47 @@ impl<'a> OutputWriter<'a> {
         };
 
         OutputWriter {
-            parse_tree: parse_tree,
             system: system,
             output: file,
         }
     }
 
-    pub fn write(&mut self) {
-        for expression in self.parse_tree.iter() {
-            match expression {
-                &Expression::ImpliedInstruction(instruction) => {
-                    self.output.write_u8(instruction.opcode).unwrap();
-                }
-                &Expression::SingleArgumentInstruction(instruction, ref argument) => {
-                    self.output.write_u8(instruction.opcode).unwrap();
-
-                    match argument {
-                        &ArgumentExpression::NumberLiteralExpression(ref number) => {
-                            self.write_number_literal(&number)
-                        }
-                    }
-                }
+    pub fn write(&mut self, parse_tree: &Vec<ParseNode<'a>>) {
+         for node in parse_tree.iter() {
+            match node.expression {
+                ParseExpression::Statement(ref statement) => {
+                    self.handle_statement(statement);
+                },
+                _ => {}
             };
+        }
+    }
+
+    fn handle_statement(&mut self, statement: &Statement) {
+        match statement {
+            &Statement::ImpliedInstruction(instruction) => {
+                self.output.write_u8(instruction.opcode).unwrap();
+            },
+            &Statement::SingleArgumentInstruction(instruction, ref argument) => {
+                self.output.write_u8(instruction.opcode).unwrap();
+
+                match argument {
+                    &ParseArgument::NumberLiteral(ref number) => {
+                        self.write_number_literal(&number)
+                    },
+                    _ => {}
+                }
+            },
+            &Statement::IndexedInstruction(instruction, ref argument) => {
+                self.output.write_u8(instruction.opcode).unwrap();
+
+                match argument {
+                    &ParseArgument::NumberLiteral(ref number) => {
+                        self.write_number_literal(&number)
+                    },
+                    _ => {}
+                }
+            }
         }
     }
 

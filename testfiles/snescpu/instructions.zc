@@ -1,4 +1,4 @@
-// Implied instructions
+//Implied instructions
 clc
 cld
 // Immediate instructions
@@ -7,4 +7,8 @@ lda #%10001000
 // Direct Page instructions
 lda 500
 lda $00Af
-
+// Indexed instructions
+lda $05,x
+lda $2140,x
+lda $7e0040,x
+lda $2140,y

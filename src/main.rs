@@ -11,7 +11,9 @@ use std::io::prelude::*;
 
 use snes_cpu::*;
 use zeal::lexer::*;
+use zeal::pass::*;
 use zeal::parser::*;
+use zeal::instruction_statement_pass::*;
 use zeal::system_definition::SystemDefinition;
 use zeal::output_writer::*;
 
@@ -50,7 +52,7 @@ fn print_error_message(error_message: &ErrorMessage) {
         severity_string,
         error_message.message);
 
-    for context_char in error_message.context_start.clone() {
+    for context_char in error_message.token.context_start.clone() {
         if context_char == '\n' {
             break;
         } else {
@@ -68,6 +70,18 @@ fn print_error_message(error_message: &ErrorMessage) {
     }
 
     println!("");
+}
+
+fn process_errors(messages: &Vec<ErrorMessage>) {
+    for error_message in messages {
+        print_error_message(&error_message);
+    }
+
+    for error_message in messages {
+        if error_message.severity == ErrorSeverity::Error {
+            std::process::exit(1);
+        }
+    }
 }
 
 fn main() {
@@ -156,22 +170,18 @@ fn main() {
 
     let lexer = Lexer::new(selected_cpu, &file_contents, file_string_path.to_str().unwrap().to_string());
 
-    let mut parser = Parser::new(selected_cpu, lexer);
-
+    let mut parser = Parser::new(lexer);
     let parse_tree = parser.parse_tree();
-
     if parser.has_errors() {
-        for error_message in &parser.error_messages {
-            print_error_message(&error_message);
-        }
-
-        for error_message in &parser.error_messages {
-            if error_message.severity == ErrorSeverity::Error {
-                std::process::exit(1);
-            }
-        }
+        process_errors(&parser.error_messages);
     }
 
-    let mut output_writer = OutputWriter::new(selected_cpu, &parse_tree, output_path);
-    output_writer.write();
+    let mut instruction_statement_pass = InstructionToStatementPass::new(selected_cpu);
+    let instruction_tree = instruction_statement_pass.do_pass(&parse_tree);
+    if instruction_statement_pass.has_errors() {
+        process_errors(&instruction_statement_pass.error_messages);
+    }
+
+    let mut output_writer = OutputWriter::new(selected_cpu, output_path);
+    output_writer.write(&instruction_tree);
 }

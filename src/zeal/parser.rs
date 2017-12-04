@@ -1,15 +1,32 @@
-use std::str::Chars;
-use std::iter::Peekable;
 use zeal::lexer::*;
 use zeal::system_definition::*;
 
-pub enum ArgumentExpression {
-    NumberLiteralExpression(NumberLiteral),
+#[derive(Clone)]
+pub enum ParseArgument {
+    NumberLiteral(NumberLiteral),
+    Register(String)
 }
 
-pub enum Expression {
+#[derive(Clone)]
+pub enum Statement {
     ImpliedInstruction(&'static InstructionInfo),
-    SingleArgumentInstruction(&'static InstructionInfo, ArgumentExpression),
+    SingleArgumentInstruction(&'static InstructionInfo, ParseArgument),
+    IndexedInstruction(&'static InstructionInfo, ParseArgument),
+}
+
+#[derive(Clone)]
+pub enum ParseExpression {
+    ImpliedInstruction(String),
+    ImmediateInstruction(String, ParseArgument),
+    SingleArgumentInstruction(String, ParseArgument),
+    IndexedInstruction(String, ParseArgument, ParseArgument),
+    Statement(Statement)
+}
+
+#[derive(Clone)]
+pub struct ParseNode<'a> {
+    pub start_token: Token<'a>,
+    pub expression: ParseExpression
 }
 
 #[derive(PartialEq)]
@@ -20,14 +37,12 @@ pub enum ErrorSeverity {
 
 pub struct ErrorMessage<'a> {
     pub message: String,
-    pub token: Token,
-    pub context_start: Peekable<Chars<'a>>,
+    pub token: Token<'a>,
     pub severity: ErrorSeverity
 }
 
 pub struct Parser<'a> {
     lexers: Vec<Lexer<'a>>,
-    system: &'static SystemDefinition,
     pub error_messages: Vec<ErrorMessage<'a>>
 }
 
@@ -39,13 +54,12 @@ enum ParseResult<T> {
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(system: &'static SystemDefinition, lexer: Lexer<'a>) -> Self {
+    pub fn new(lexer: Lexer<'a>) -> Self {
         let mut lexers = Vec::new();
         lexers.push(lexer);
 
         Parser {
             lexers: lexers,
-            system: system,
             error_messages: Vec::new()
         }
     }
@@ -54,27 +68,27 @@ impl<'a> Parser<'a> {
         return !self.error_messages.is_empty();
     }
 
-    pub fn parse_tree(&mut self) -> Vec<Expression> {
-        let mut expressions = Vec::new();
+    pub fn parse_tree(&mut self) -> Vec<ParseNode<'a>> {
+        let mut parsed_tree = Vec::new();
 
         loop {
             match self.parse() {
-                ParseResult::Some(expression) => expressions.push(expression),
+                ParseResult::Some(node) => parsed_tree.push(node),
                 ParseResult::None => continue,
                 ParseResult::Error => continue,
                 ParseResult::Done => break,
             }
         }
 
-        return expressions;
+        return parsed_tree;
     }
 
-    fn parse(&mut self) -> ParseResult<Expression> {
+    fn parse(&mut self) -> ParseResult<ParseNode<'a>> {
         // root : (cpuInstruction)* ;
         let token = self.get_next_token();
         match token.ttype {
             TokenType::EndOfFile => return ParseResult::Done,
-            TokenType::Opcode(opcode_name) => self.parse_cpu_instruction(opcode_name),
+            TokenType::Opcode(ref opcode_name) => self.parse_cpu_instruction(&token, opcode_name),
             TokenType::Invalid(invalid_token) => {
                 self.add_invalid_token_message(invalid_token, token);
                 return ParseResult::Error;
@@ -86,11 +100,13 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_cpu_instruction(&mut self, opcode_name: String) -> ParseResult<Expression> {
+    fn parse_cpu_instruction(&mut self, opcode_token: &Token<'a>, opcode_name: &str) -> ParseResult<ParseNode<'a>> {
         // cpuInstruction : OPCODE #Implied
         //    | OPCODE '#' argument #Immediate
         //    | OPCODE argument #SingleArgument
+        //    | OPCODE argument,register #Indexed
         //    ;
+
         let lookahead = self.lookahead();
 
         let mut is_immediate = false;
@@ -103,31 +119,59 @@ impl<'a> Parser<'a> {
 
         match argument {
             ParseResult::Some(result) => {
-                match result {
-                    ArgumentExpression::NumberLiteralExpression(number_literal) => {
-                        let possible_instruction = if is_immediate {
-                            self.find_suitable_instruction(&opcode_name, &[AddressingMode::Immediate])
-                        } else if number_literal.argument_size == ArgumentSize::Word24 {
-                            self.find_suitable_instruction(&opcode_name, &[AddressingMode::AbsoluteLong])
-                        } else if number_literal.argument_size == ArgumentSize::Word16 {
-                            self.find_suitable_instruction(&opcode_name, &[AddressingMode::Absolute, AddressingMode::RelativeLong])
-                        } else {
-                            self.find_suitable_instruction(&opcode_name, &[AddressingMode::Direct, AddressingMode::Relative])
-                        };
+                if is_immediate {
+                    return ParseResult::Some(ParseNode {
+                        start_token: opcode_token.clone(),
+                        expression: ParseExpression::ImmediateInstruction(opcode_name.to_string(), result)
+                    });
+                } else {
+                    let comma = self.lookahead();
+                    if comma.ttype == TokenType::Comma {
+                        self.get_next_token();
 
-                        match possible_instruction {
-                            Some(instruction) => return ParseResult::Some(Expression::SingleArgumentInstruction(instruction, result)),
-                            None => return ParseResult::Error
+                        let second_lookahead = self.lookahead();
+
+                        match second_lookahead.ttype {
+                            TokenType::Register(_) => {
+                                let second_argument = self.parse_argument();
+                                match second_argument {
+                                    ParseResult::Some(second_result) => {
+                                        return ParseResult::Some(ParseNode {
+                                            start_token: opcode_token.clone(),
+                                            expression: ParseExpression::IndexedInstruction(opcode_name.to_string(), result, second_result)
+                                        });
+                                    },
+                                    ParseResult::None => {
+                                        self.add_error_message(&format!("expected register as second argument."), second_lookahead);
+                                        return ParseResult::Error
+                                    },
+                                    ParseResult::Error => {
+                                        return ParseResult::Error
+                                    },
+                                    ParseResult::Done => {
+                                        return ParseResult::Done
+                                    }
+                                }
+                            },
+                            _ => {
+                                self.get_next_token();
+                                self.add_error_message(&format!("expected register as second argument."), second_lookahead);
+                                return ParseResult::Error
+                            }
                         }
                     }
+
+                    return ParseResult::Some(ParseNode {
+                        start_token: opcode_token.clone(),
+                        expression: ParseExpression::SingleArgumentInstruction(opcode_name.to_string(), result)
+                    });
                 }
             },
             ParseResult::None => {
-                let possible_instruction = self.find_suitable_instruction(&opcode_name, &[AddressingMode::Implied]);
-                match possible_instruction {
-                    Some(instruction) => return ParseResult::Some(Expression::ImpliedInstruction(instruction)),
-                    None => return ParseResult::Error
-                }
+                return ParseResult::Some(ParseNode {
+                    start_token: opcode_token.clone(),
+                    expression: ParseExpression::ImpliedInstruction(opcode_name.to_string())
+                });
             },
             ParseResult::Error => {
                 return ParseResult::Error
@@ -138,13 +182,20 @@ impl<'a> Parser<'a> {
         };
     }
 
-    fn parse_argument(&mut self) -> ParseResult<ArgumentExpression> {
-        // argument : NUMBER_LITERAL ;
+    fn parse_argument(&mut self) -> ParseResult<ParseArgument> {
+        // argument : NUMBER_LITERAL
+        //          | REGISTER
+        //          ;
+
         let lookahead = self.lookahead();
         match lookahead.ttype {
             TokenType::NumberLiteral(number_literal) => {
-                self.get_next_token(); // Eat token
-                ParseResult::Some(ArgumentExpression::NumberLiteralExpression(number_literal))
+                self.get_next_token(); // Eat tokenNumberLiteral
+                ParseResult::Some(ParseArgument::NumberLiteral(number_literal))
+            },
+            TokenType::Register(register_name) => {
+                self.get_next_token(); // Eat register token
+                ParseResult::Some(ParseArgument::Register(register_name))
             },
             TokenType::Opcode(_) => {
                 ParseResult::None
@@ -159,31 +210,17 @@ impl<'a> Parser<'a> {
             },
             _ => {
                 self.get_next_token(); // Eat token
-                self.add_error_message(&format!("A number litteral was expected here."), lookahead);
+                self.add_error_message(&format!("A number literal or register was expected here."), lookahead);
                 ParseResult::Error
             }
         }
     }
 
-    fn find_suitable_instruction(&mut self, opcode_name: &str, possible_addressings: &[AddressingMode]) -> Option<&'static InstructionInfo> {
-        for instruction in self.system.instructions.iter() {
-            if instruction.name == opcode_name {
-                for addressing_mode in possible_addressings.iter() {
-                    if &instruction.addressing == addressing_mode {
-                        return Some(instruction)
-                    }
-                }
-            }
-        }
-
-        return None
-    }
-
-    fn lookahead(&mut self) -> Token {
+    fn lookahead(&mut self) -> Token<'a> {
         self.lexer().unwrap().lookahead()
     }
 
-    fn get_next_token(&mut self) -> Token {
+    fn get_next_token(&mut self) -> Token<'a> {
         self.lexer().unwrap().get_next_token()
     }
 
@@ -191,18 +228,17 @@ impl<'a> Parser<'a> {
         self.lexers.last_mut()
     }
 
-    fn add_error_message(&mut self, error_message: &str, offending_token: Token) {
+    fn add_error_message(&mut self, error_message: &str, offending_token: Token<'a>) {
         let new_message = ErrorMessage {
             message: error_message.to_owned(),
             token: offending_token,
-            context_start: self.lexer().unwrap().start_line.clone(),
             severity: ErrorSeverity::Error
         };
 
         self.error_messages.push(new_message);
     }
 
-    fn add_invalid_token_message(&mut self, invalid_token: char, token: Token) {
+    fn add_invalid_token_message(&mut self, invalid_token: char, token: Token<'a>) {
         self.add_error_message(&format!("Invalid token '{}' found.", invalid_token), token);
     }
 }

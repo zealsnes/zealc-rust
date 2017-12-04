@@ -9,7 +9,7 @@
             "type": "cppvsdbg",
             "request": "launch",
             "program": "target/debug/zealc",
-            "args": ["-o test.bin", "testfiles\\snescpu\\implied.zc"],
+            "args": ["-o test.bin", "testfiles\\snescpu\\instructions.zc"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
