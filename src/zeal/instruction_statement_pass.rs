@@ -90,6 +90,31 @@ impl<'a> InstructionToStatementPass<'a> {
 
         self.error_messages.push(new_message);
     }
+
+    fn add_to_argument_list_capture_register(&mut self, argument_list: &mut Vec<InstructionArgument>, argument: &ParseArgument) -> Option<String> {
+        match argument {
+            &ParseArgument::NumberLiteral(number) => {
+                argument_list.push(InstructionArgument::Number(number.argument_size));
+                return None;
+            },
+            &ParseArgument::Register(ref register_name) => {
+                let result_register_name = register_name.to_owned();
+                argument_list.push(InstructionArgument::NotStaticRegister(register_name.to_owned()));
+                return Some(result_register_name);
+            }
+        };
+    }
+
+    fn add_to_argument_list(&mut self, argument_list: &mut Vec<InstructionArgument>, argument: &ParseArgument) {
+        match argument {
+            &ParseArgument::NumberLiteral(number) => {
+                argument_list.push(InstructionArgument::Number(number.argument_size));
+            },
+            &ParseArgument::Register(ref register_name) => {
+                argument_list.push(InstructionArgument::NotStaticRegister(register_name.to_owned()));
+            }
+        };
+    }
 }
 
 impl<'a> TreePass<'a> for InstructionToStatementPass<'a> {
@@ -164,25 +189,15 @@ impl<'a> TreePass<'a> for InstructionToStatementPass<'a> {
                     let mut argument_list = Vec::new();
                     let mut result_register_name = String::new();
 
-                    match argument1 {
-                        &ParseArgument::NumberLiteral(number) => {
-                            argument_list.push(InstructionArgument::Number(number.argument_size));
-                        },
-                        &ParseArgument::Register(ref register_name) => {
-                           result_register_name = register_name.to_owned();
-                           argument_list.push(InstructionArgument::NotStaticRegister(register_name.to_owned()));
-                       }
-                    };
+                    match self.add_to_argument_list_capture_register(&mut argument_list, &argument1) {
+                        Some(result) => result_register_name = result,
+                        _ => {}
+                    }
 
-                    match argument2 {
-                        &ParseArgument::NumberLiteral(number) => {
-                            argument_list.push(InstructionArgument::Number(number.argument_size));
-                        },
-                        &ParseArgument::Register(ref register_name) => {
-                            result_register_name = register_name.to_owned();
-                            argument_list.push(InstructionArgument::NotStaticRegister(register_name.to_owned()));
-                       }
-                    };
+                    match self.add_to_argument_list_capture_register(&mut argument_list, &argument2) {
+                        Some(result) => result_register_name = result,
+                        _ => {}
+                    }
 
                     match self.find_suitable_instruction(opcode_name, &[AddressingMode::Indexed], &argument_list) {
                         Some(instruction) => {
@@ -221,7 +236,7 @@ impl<'a> TreePass<'a> for InstructionToStatementPass<'a> {
                        &ParseArgument::Register(ref register_name) => {
                            self.add_error_message(&format!("addressing mode does not support '{}' register argument.", register_name), node.start_token.clone());
                            new_tree.push(node.clone());
-                       }
+                        }
                     }
                 },
                 ParseExpression::IndirectLongInstruction(ref opcode_name, ref argument) => {
@@ -250,25 +265,15 @@ impl<'a> TreePass<'a> for InstructionToStatementPass<'a> {
                     let mut argument_list = Vec::new();
                     let mut result_register_name = String::new();
 
-                    match argument1 {
-                        &ParseArgument::NumberLiteral(number) => {
-                            argument_list.push(InstructionArgument::Number(number.argument_size));
-                        },
-                        &ParseArgument::Register(ref register_name) => {
-                           result_register_name = register_name.to_owned();
-                           argument_list.push(InstructionArgument::NotStaticRegister(register_name.to_owned()));
-                       }
-                    };
+                    match self.add_to_argument_list_capture_register(&mut argument_list, &argument1) {
+                        Some(result) => result_register_name = result,
+                        None => {}
+                    }
 
-                    match argument2 {
-                        &ParseArgument::NumberLiteral(number) => {
-                            argument_list.push(InstructionArgument::Number(number.argument_size));
-                        },
-                        &ParseArgument::Register(ref register_name) => {
-                            result_register_name = register_name.to_owned();
-                            argument_list.push(InstructionArgument::NotStaticRegister(register_name.to_owned()));
-                       }
-                    };
+                    match self.add_to_argument_list_capture_register(&mut argument_list, &argument2) {
+                        Some(result) => result_register_name = result,
+                        None => {}
+                    }
 
                     match self.find_suitable_instruction(opcode_name, &[AddressingMode::IndexedIndirect], &argument_list) {
                         Some(instruction) => {
@@ -287,25 +292,15 @@ impl<'a> TreePass<'a> for InstructionToStatementPass<'a> {
                     let mut argument_list = Vec::new();
                     let mut result_register_name = String::new();
 
-                    match argument1 {
-                        &ParseArgument::NumberLiteral(number) => {
-                            argument_list.push(InstructionArgument::Number(number.argument_size));
-                        },
-                        &ParseArgument::Register(ref register_name) => {
-                           result_register_name = register_name.to_owned();
-                           argument_list.push(InstructionArgument::NotStaticRegister(register_name.to_owned()));
-                       }
-                    };
+                    match self.add_to_argument_list_capture_register(&mut argument_list, &argument1) {
+                        Some(result) => result_register_name = result,
+                        None => {}
+                    }
 
-                    match argument2 {
-                        &ParseArgument::NumberLiteral(number) => {
-                            argument_list.push(InstructionArgument::Number(number.argument_size));
-                        },
-                        &ParseArgument::Register(ref register_name) => {
-                            result_register_name = register_name.to_owned();
-                            argument_list.push(InstructionArgument::NotStaticRegister(register_name.to_owned()));
-                       }
-                    };
+                    match self.add_to_argument_list_capture_register(&mut argument_list, &argument2) {
+                        Some(result) => result_register_name = result,
+                        None => {}
+                    }
 
                     match self.find_suitable_instruction(opcode_name, &[AddressingMode::IndirectIndexed], &argument_list) {
                         Some(instruction) => {
@@ -324,25 +319,15 @@ impl<'a> TreePass<'a> for InstructionToStatementPass<'a> {
                     let mut argument_list = Vec::new();
                     let mut result_register_name = String::new();
 
-                    match argument1 {
-                        &ParseArgument::NumberLiteral(number) => {
-                            argument_list.push(InstructionArgument::Number(number.argument_size));
-                        },
-                        &ParseArgument::Register(ref register_name) => {
-                           result_register_name = register_name.to_owned();
-                           argument_list.push(InstructionArgument::NotStaticRegister(register_name.to_owned()));
-                       }
-                    };
+                    match self.add_to_argument_list_capture_register(&mut argument_list, &argument1) {
+                        Some(result) => result_register_name = result,
+                        None => {}
+                    }
 
-                    match argument2 {
-                        &ParseArgument::NumberLiteral(number) => {
-                            argument_list.push(InstructionArgument::Number(number.argument_size));
-                        },
-                        &ParseArgument::Register(ref register_name) => {
-                            result_register_name = register_name.to_owned();
-                            argument_list.push(InstructionArgument::NotStaticRegister(register_name.to_owned()));
-                       }
-                    };
+                    match self.add_to_argument_list_capture_register(&mut argument_list, &argument2) {
+                        Some(result) => result_register_name = result,
+                        None => {}
+                    }
 
                     match self.find_suitable_instruction(opcode_name, &[AddressingMode::IndirectIndexedLong], &argument_list) {
                         Some(instruction) => {
@@ -360,23 +345,8 @@ impl<'a> TreePass<'a> for InstructionToStatementPass<'a> {
                 ParseExpression::BlockMoveInstruction(ref opcode_name, ref argument1, ref argument2) => {
                     let mut argument_list = Vec::new();
 
-                    match argument1 {
-                        &ParseArgument::NumberLiteral(number) => {
-                            argument_list.push(InstructionArgument::Number(number.argument_size));
-                        },
-                        &ParseArgument::Register(ref register_name) => {
-                           argument_list.push(InstructionArgument::NotStaticRegister(register_name.to_owned()));
-                       }
-                    };
-
-                    match argument2 {
-                        &ParseArgument::NumberLiteral(number) => {
-                            argument_list.push(InstructionArgument::Number(number.argument_size));
-                        },
-                        &ParseArgument::Register(ref register_name) => {
-                            argument_list.push(InstructionArgument::NotStaticRegister(register_name.to_owned()));
-                       }
-                    };
+                    self.add_to_argument_list(&mut argument_list, &argument1);
+                    self.add_to_argument_list(&mut argument_list, &argument2);
 
                     match self.find_suitable_instruction(opcode_name, &[AddressingMode::BlockMove], &argument_list) {
                         Some(instruction) => {
@@ -391,6 +361,26 @@ impl<'a> TreePass<'a> for InstructionToStatementPass<'a> {
                         }
                     }
                 },
+                ParseExpression::StackRelativeIndirectIndexedInstruction(ref opcode_name, ref argument1, ref argument2, ref argument3) => {
+                    let mut argument_list = Vec::new();
+
+                    self.add_to_argument_list(&mut argument_list, &argument1);
+                    self.add_to_argument_list(&mut argument_list, &argument2);
+                    self.add_to_argument_list(&mut argument_list, &argument3);
+
+                    match self.find_suitable_instruction(opcode_name, &[AddressingMode::StackRelativeIndirectIndexed], &argument_list) {
+                        Some(instruction) => {
+                            new_tree.push(ParseNode {
+                                start_token: node.start_token.clone(),
+                                expression: ParseExpression::Statement(Statement::SingleArgumentInstruction(instruction, argument1.clone()))
+                            });
+                        },
+                        None => {
+                            self.add_error_message(&format!("opcode '{}' does not support stack relative indirect indexed addressing mode.", opcode_name), node.start_token.clone());
+                            new_tree.push(node.clone());
+                        }
+                    }
+                },
                 _=> {
                     new_tree.push(node.clone());
                 }
@@ -399,4 +389,6 @@ impl<'a> TreePass<'a> for InstructionToStatementPass<'a> {
 
         return new_tree;
     }
+
+   
 }

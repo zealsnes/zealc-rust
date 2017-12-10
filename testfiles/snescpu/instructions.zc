@@ -27,3 +27,5 @@ mvp $2c,$2d
 mvn $0f,$10
 // Stack relative
 lda $0c,s
+// Stack relatve indirect indexed
+lda ($3c,s),y

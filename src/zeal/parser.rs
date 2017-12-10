@@ -26,6 +26,7 @@ pub enum ParseExpression {
     IndirectIndexedInstruction(String, ParseArgument, ParseArgument),
     IndirectIndexedLongInstruction(String, ParseArgument, ParseArgument),
     BlockMoveInstruction(String, ParseArgument, ParseArgument),
+    StackRelativeIndirectIndexedInstruction(String, ParseArgument, ParseArgument, ParseArgument),
     Statement(Statement),
 }
 
@@ -115,6 +116,7 @@ impl<'a> Parser<'a> {
     //    | OPCODE (argument,register) #IndexedIndirect
     //    | OPCODE (argument),register #IndirectIndexed
     //    | OPCODE [argument],register #IndirectIndexedLong
+    //    | OPCODE (argument,register),register #StackRelativeIndirectIndexed
     //    ;
     fn parse_cpu_instruction(
         &mut self,
@@ -327,14 +329,44 @@ impl<'a> Parser<'a> {
                             if second_lookahead.ttype == TokenType::RightParen {
                                 self.get_next_token(); // Eat right parenthesis
 
-                                return ParseResult::Some(ParseNode {
-                                    start_token: opcode_token.clone(),
-                                    expression: ParseExpression::IndexedIndirectInstruction(
-                                        opcode_name.to_string(),
-                                        result,
-                                        second_result,
-                                    ),
-                                });
+                                let third_lookahead = self.lookahead();
+                                if third_lookahead.ttype == TokenType::Comma {
+                                    self.get_next_token(); // Eat comma
+
+                                    let third_argument = self.parse_argument();
+
+                                    match third_argument {
+                                        ParseResult::Some(third_result) => {
+                                            return ParseResult::Some(ParseNode {
+                                                start_token: opcode_token.clone(),
+                                                expression: ParseExpression::StackRelativeIndirectIndexedInstruction(
+                                                    opcode_name.to_string(),
+                                                    result,
+                                                    second_result,
+                                                    third_result
+                                                ),
+                                            });
+                                        }
+                                        ParseResult::None => {
+                                            self.add_error_message(
+                                                &format!("register expected as argument."),
+                                                opcode_token.clone(),
+                                            );
+                                            return ParseResult::Error;
+                                        }
+                                        ParseResult::Done => return ParseResult::Done,
+                                        ParseResult::Error => return ParseResult::Error
+                                    }
+                                } else {
+                                    return ParseResult::Some(ParseNode {
+                                        start_token: opcode_token.clone(),
+                                        expression: ParseExpression::IndexedIndirectInstruction(
+                                            opcode_name.to_string(),
+                                            result,
+                                            second_result,
+                                        ),
+                                    });
+                                }
                             } else {
                                 self.add_error_message(
                                     &format!("no closing parenthesis found."),
