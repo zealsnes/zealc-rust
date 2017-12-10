@@ -174,7 +174,7 @@ impl<'a> TreePass<'a> for InstructionToStatementPass<'a> {
                                     });
                                 },
                                 None => {
-                                    self.add_error_message(&format!("opcode '{}' does not support {} addressing mode.", opcode_name, (&self.system.size_formatting)(number.argument_size)), node.start_token.clone());
+                                    self.add_error_message(&format!("opcode '{}' does not support {} addressing mode.", opcode_name, (&self.system.size_to_addressing_mode)(number.argument_size)), node.start_token.clone());
                                     new_tree.push(node.clone());
                                 }
                             }

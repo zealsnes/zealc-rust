@@ -42,7 +42,7 @@ pub struct SystemDefinition {
     pub name: &'static str,
     pub is_big_endian: bool,
     pub registers: &'static [&'static str],
-    pub size_formatting: fn(ArgumentSize) -> &'static str,
+    pub size_to_addressing_mode: fn(ArgumentSize) -> &'static str,
     pub instructions: &'static [InstructionInfo],
 }
 

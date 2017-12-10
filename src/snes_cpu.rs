@@ -1,6 +1,6 @@
 use zeal::system_definition::*;
 
-fn snes_argument_size_to_string(size: ArgumentSize) -> &'static str {
+fn snes_argument_size_to_addressing_mode(size: ArgumentSize) -> &'static str {
     match size {
         ArgumentSize::Word8 => "direct page",
         ArgumentSize::Word16 => "absolute",
@@ -18,7 +18,7 @@ pub static SNES_CPU: SystemDefinition = SystemDefinition {
         "y",
         "s",
     ],
-    size_formatting: snes_argument_size_to_string,
+    size_to_addressing_mode: snes_argument_size_to_addressing_mode,
     instructions: &[
         InstructionInfo { name: "clc", addressing: AddressingMode::Implied, opcode: 0x18, arguments: &[] },
         InstructionInfo { name: "cld", addressing: AddressingMode::Implied, opcode: 0xD8, arguments: &[] },
