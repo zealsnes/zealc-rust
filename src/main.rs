@@ -17,15 +17,18 @@ use zeal::instruction_statement_pass::*;
 use zeal::system_definition::SystemDefinition;
 use zeal::output_writer::*;
 
-static SUPPORTED_SYSTEMS: &'static [&'static SystemDefinition] = &[
-    &SNES_CPU
-];
+static SUPPORTED_SYSTEMS: &'static [&'static SystemDefinition] = &[&SNES_CPU];
 
 fn absolute_path(path: &Path) -> std::io::Result<PathBuf> {
     let path_buf = path.canonicalize()?;
 
     #[cfg(windows)]
-    let path_buf = Path::new(path_buf.as_path().to_string_lossy().trim_left_matches(r"\\?\")).to_path_buf();
+    let path_buf = Path::new(
+        path_buf
+            .as_path()
+            .to_string_lossy()
+            .trim_left_matches(r"\\?\"),
+    ).to_path_buf();
 
     Ok(path_buf)
 }
@@ -33,7 +36,7 @@ fn absolute_path(path: &Path) -> std::io::Result<PathBuf> {
 fn find_system(cpu_name: &str) -> &'static SystemDefinition {
     for system in SUPPORTED_SYSTEMS.iter() {
         if system.short_name == cpu_name {
-            return system
+            return system;
         }
     }
 
@@ -43,14 +46,17 @@ fn find_system(cpu_name: &str) -> &'static SystemDefinition {
 fn print_error_message(error_message: &ErrorMessage) {
     let severity_string = match error_message.severity {
         ErrorSeverity::Error => "error",
-        ErrorSeverity::Warning => "warning"
+        ErrorSeverity::Warning => "warning",
     };
 
-    println!("{}({},{}): {}: {}", error_message.token.source_file,
+    println!(
+        "{}({},{}): {}: {}",
+        error_message.token.source_file,
         error_message.token.line,
         error_message.token.start_column,
         severity_string,
-        error_message.message);
+        error_message.message
+    );
 
     for context_char in error_message.token.context_start.clone() {
         if context_char == '\n' {
@@ -61,7 +67,7 @@ fn print_error_message(error_message: &ErrorMessage) {
     }
     println!("");
 
-    for _ in 0..(error_message.token.start_column-1) {
+    for _ in 0..(error_message.token.start_column - 1) {
         print!(" ");
     }
 
@@ -112,7 +118,7 @@ fn main() {
         .arg(
             Arg::with_name("listcpu")
                 .long("list-cpu")
-                .help("List available CPU types.")
+                .help("List available CPU types."),
         );
 
     let cmd_matches = zeal_args_info.get_matches();
@@ -131,8 +137,8 @@ fn main() {
             println!("ERROR: No input file found!\n");
             println!("{}", cmd_matches.usage());
             std::process::exit(1);
-        },
-        Some(result) => result
+        }
+        Some(result) => result,
     };
 
     let output_path = match cmd_matches.value_of("output") {
@@ -140,8 +146,8 @@ fn main() {
             println!("ERROR: No output file found!\n");
             println!("{}", cmd_matches.usage());
             std::process::exit(1);
-        },
-        Some(result) => Path::new(result)
+        }
+        Some(result) => Path::new(result),
     };
 
     let input_path = Path::new(input_file);
@@ -155,20 +161,24 @@ fn main() {
     let mut file_contents = String::new();
     match file.read_to_string(&mut file_contents) {
         Err(why) => panic!("Couldn't read {}: {}", path_display, why.description()),
-        Ok(result) => result
+        Ok(result) => result,
     };
 
     let file_string_path = match absolute_path(input_path) {
         Err(_) => std::path::PathBuf::new(),
-        Ok(result) => result
+        Ok(result) => result,
     };
 
     let selected_cpu = match cmd_matches.value_of("cpu") {
         None => &SNES_CPU,
-        Some(cpu_name) => find_system(cpu_name)
+        Some(cpu_name) => find_system(cpu_name),
     };
 
-    let lexer = Lexer::new(selected_cpu, &file_contents, file_string_path.to_str().unwrap().to_string());
+    let lexer = Lexer::new(
+        selected_cpu,
+        &file_contents,
+        file_string_path.to_str().unwrap().to_string(),
+    );
 
     let mut parser = Parser::new(lexer);
     let parse_tree = parser.parse_tree();

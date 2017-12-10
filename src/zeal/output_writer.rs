@@ -30,11 +30,11 @@ impl<'a> OutputWriter {
     }
 
     pub fn write(&mut self, parse_tree: &Vec<ParseNode<'a>>) {
-         for node in parse_tree.iter() {
+        for node in parse_tree.iter() {
             match node.expression {
                 ParseExpression::Statement(ref statement) => {
                     self.handle_statement(statement);
-                },
+                }
                 _ => {}
             };
         }
@@ -44,14 +44,12 @@ impl<'a> OutputWriter {
         match statement {
             &Statement::ImpliedInstruction(instruction) => {
                 self.output.write_u8(instruction.opcode).unwrap();
-            },
+            }
             &Statement::SingleArgumentInstruction(instruction, ref argument) => {
                 self.output.write_u8(instruction.opcode).unwrap();
 
                 match argument {
-                    &ParseArgument::NumberLiteral(ref number) => {
-                        self.write_number_literal(&number)
-                    },
+                    &ParseArgument::NumberLiteral(ref number) => self.write_number_literal(&number),
                     _ => {}
                 }
             }
@@ -64,16 +62,24 @@ impl<'a> OutputWriter {
         if is_big_endian {
             match number.argument_size {
                 ArgumentSize::Word8 => self.output.write_u8(number.number as u8).unwrap(),
-                ArgumentSize::Word16 => self.output.write_u16::<BigEndian>(number.number as u16).unwrap(),
+                ArgumentSize::Word16 => self.output
+                    .write_u16::<BigEndian>(number.number as u16)
+                    .unwrap(),
                 ArgumentSize::Word24 => self.output.write_u24::<BigEndian>(number.number).unwrap(),
                 ArgumentSize::Word32 => self.output.write_u32::<BigEndian>(number.number).unwrap(),
             };
         } else {
             match number.argument_size {
                 ArgumentSize::Word8 => self.output.write_u8(number.number as u8).unwrap(),
-                ArgumentSize::Word16 => self.output.write_u16::<LittleEndian>(number.number as u16).unwrap(),
-                ArgumentSize::Word24 => self.output.write_u24::<LittleEndian>(number.number).unwrap(),
-                ArgumentSize::Word32 => self.output.write_u32::<LittleEndian>(number.number).unwrap(),
+                ArgumentSize::Word16 => self.output
+                    .write_u16::<LittleEndian>(number.number as u16)
+                    .unwrap(),
+                ArgumentSize::Word24 => self.output
+                    .write_u24::<LittleEndian>(number.number)
+                    .unwrap(),
+                ArgumentSize::Word32 => self.output
+                    .write_u32::<LittleEndian>(number.number)
+                    .unwrap(),
             };
         }
     }

@@ -11,7 +11,7 @@ pub enum InstructionArgument {
     Number(ArgumentSize),
     Numbers(&'static [ArgumentSize]),
     Register(&'static str),
-    NotStaticRegister(String)
+    NotStaticRegister(String),
 }
 
 #[derive(PartialEq)]
@@ -38,14 +38,14 @@ pub struct SystemDefinition {
     pub is_big_endian: bool,
     pub registers: &'static [&'static str],
     pub size_formatting: fn(ArgumentSize) -> &'static str,
-    pub instructions: &'static [InstructionInfo]
+    pub instructions: &'static [InstructionInfo],
 }
 
 pub fn argument_size_to_bit_size(size: ArgumentSize) -> i32 {
-     match size {
+    match size {
         ArgumentSize::Word8 => 8,
         ArgumentSize::Word16 => 16,
         ArgumentSize::Word24 => 24,
-        ArgumentSize::Word32 => 32
+        ArgumentSize::Word32 => 32,
     }
 }

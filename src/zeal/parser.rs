@@ -4,13 +4,13 @@ use zeal::system_definition::*;
 #[derive(Clone)]
 pub enum ParseArgument {
     NumberLiteral(NumberLiteral),
-    Register(String)
+    Register(String),
 }
 
 #[derive(Clone)]
 pub enum Statement {
     ImpliedInstruction(&'static InstructionInfo),
-    SingleArgumentInstruction(&'static InstructionInfo, ParseArgument)
+    SingleArgumentInstruction(&'static InstructionInfo, ParseArgument),
 }
 
 #[derive(Clone)]
@@ -21,37 +21,37 @@ pub enum ParseExpression {
     IndexedInstruction(String, ParseArgument, ParseArgument),
     IndirectInstruction(String, ParseArgument),
     IndirectLongInstruction(String, ParseArgument),
-    Statement(Statement)
+    Statement(Statement),
 }
 
 #[derive(Clone)]
 pub struct ParseNode<'a> {
     pub start_token: Token<'a>,
-    pub expression: ParseExpression
+    pub expression: ParseExpression,
 }
 
 #[derive(PartialEq)]
 pub enum ErrorSeverity {
     Error,
-    Warning
+    Warning,
 }
 
 pub struct ErrorMessage<'a> {
     pub message: String,
     pub token: Token<'a>,
-    pub severity: ErrorSeverity
+    pub severity: ErrorSeverity,
 }
 
 pub struct Parser<'a> {
     lexers: Vec<Lexer<'a>>,
-    pub error_messages: Vec<ErrorMessage<'a>>
+    pub error_messages: Vec<ErrorMessage<'a>>,
 }
 
 enum ParseResult<T> {
     None,
     Done,
     Error,
-    Some(T)
+    Some(T),
 }
 
 impl<'a> Parser<'a> {
@@ -61,7 +61,7 @@ impl<'a> Parser<'a> {
 
         Parser {
             lexers: lexers,
-            error_messages: Vec::new()
+            error_messages: Vec::new(),
         }
     }
 
@@ -93,15 +93,19 @@ impl<'a> Parser<'a> {
             TokenType::Invalid(invalid_token) => {
                 self.add_invalid_token_message(invalid_token, token);
                 return ParseResult::Error;
-            },
-             _ => {
+            }
+            _ => {
                 self.add_error_message("unexpected token found.", token);
-                return ParseResult::Error
+                return ParseResult::Error;
             }
         }
     }
 
-    fn parse_cpu_instruction(&mut self, opcode_token: &Token<'a>, opcode_name: &str) -> ParseResult<ParseNode<'a>> {
+    fn parse_cpu_instruction(
+        &mut self,
+        opcode_token: &Token<'a>,
+        opcode_name: &str,
+    ) -> ParseResult<ParseNode<'a>> {
         // cpuInstruction : OPCODE #Implied
         //    | OPCODE '#' argument #Immediate
         //    | OPCODE argument #SingleArgument
@@ -136,43 +140,52 @@ impl<'a> Parser<'a> {
                                     ParseResult::Some(second_result) => {
                                         return ParseResult::Some(ParseNode {
                                             start_token: opcode_token.clone(),
-                                            expression: ParseExpression::IndexedInstruction(opcode_name.to_string(), result, second_result)
+                                            expression: ParseExpression::IndexedInstruction(
+                                                opcode_name.to_string(),
+                                                result,
+                                                second_result,
+                                            ),
                                         });
-                                    },
-                                    ParseResult::None => {
-                                        self.add_error_message(&format!("expected register as second argument."), second_lookahead);
-                                        return ParseResult::Error
-                                    },
-                                    ParseResult::Error => {
-                                        return ParseResult::Error
-                                    },
-                                    ParseResult::Done => {
-                                        return ParseResult::Done
                                     }
+                                    ParseResult::None => {
+                                        self.add_error_message(
+                                            &format!("expected register as second argument."),
+                                            second_lookahead,
+                                        );
+                                        return ParseResult::Error;
+                                    }
+                                    ParseResult::Error => return ParseResult::Error,
+                                    ParseResult::Done => return ParseResult::Done,
                                 }
-                            },
+                            }
                             _ => {
                                 self.get_next_token();
-                                self.add_error_message(&format!("expected register as second argument."), second_lookahead);
-                                return ParseResult::Error
+                                self.add_error_message(
+                                    &format!("expected register as second argument."),
+                                    second_lookahead,
+                                );
+                                return ParseResult::Error;
                             }
                         }
                     }
 
                     return ParseResult::Some(ParseNode {
                         start_token: opcode_token.clone(),
-                        expression: ParseExpression::SingleArgumentInstruction(opcode_name.to_string(), result)
+                        expression: ParseExpression::SingleArgumentInstruction(
+                            opcode_name.to_string(),
+                            result,
+                        ),
                     });
-                },
+                }
                 ParseResult::None => {
                     return ParseResult::Some(ParseNode {
                         start_token: opcode_token.clone(),
-                        expression: ParseExpression::ImpliedInstruction(opcode_name.to_string())
+                        expression: ParseExpression::ImpliedInstruction(opcode_name.to_string()),
                     });
-                },
+                }
                 ParseResult::Error => {
                     return ParseResult::Error;
-                },
+                }
                 ParseResult::Done => {
                     return ParseResult::Done;
                 }
@@ -180,8 +193,12 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_immediate(&mut self, opcode_token: &Token<'a>, opcode_name: &str) -> ParseResult<ParseNode<'a>> {
-         self.get_next_token();
+    fn parse_immediate(
+        &mut self,
+        opcode_token: &Token<'a>,
+        opcode_name: &str,
+    ) -> ParseResult<ParseNode<'a>> {
+        self.get_next_token();
 
         let argument = self.parse_argument();
 
@@ -189,25 +206,32 @@ impl<'a> Parser<'a> {
             ParseResult::Some(result) => {
                 return ParseResult::Some(ParseNode {
                     start_token: opcode_token.clone(),
-                    expression: ParseExpression::ImmediateInstruction(opcode_name.to_string(), result)
+                    expression: ParseExpression::ImmediateInstruction(
+                        opcode_name.to_string(),
+                        result,
+                    ),
                 });
-            },
+            }
             // Found an opcode
             ParseResult::None => {
                 let offending_token = self.get_next_token();
                 self.add_error_message(&format!("number expected as argument."), offending_token);
                 return ParseResult::Error;
-            },
+            }
             ParseResult::Error => {
                 return ParseResult::Error;
-            },
+            }
             ParseResult::Done => {
                 return ParseResult::Done;
             }
         };
     }
 
-    fn parse_indirect(&mut self, opcode_token: &Token<'a>, opcode_name: &str) -> ParseResult<ParseNode<'a>> {
+    fn parse_indirect(
+        &mut self,
+        opcode_token: &Token<'a>,
+        opcode_name: &str,
+    ) -> ParseResult<ParseNode<'a>> {
         let left_paren = self.get_next_token(); // Eat left parenthesis
 
         let argument = self.parse_argument();
@@ -221,29 +245,36 @@ impl<'a> Parser<'a> {
 
                     return ParseResult::Some(ParseNode {
                         start_token: opcode_token.clone(),
-                        expression: ParseExpression::IndirectInstruction(opcode_name.to_string(), result)
+                        expression: ParseExpression::IndirectInstruction(
+                            opcode_name.to_string(),
+                            result,
+                        ),
                     });
                 } else {
                     self.add_error_message(&format!("no closing parenthesis found."), left_paren);
                     return ParseResult::Error;
                 }
-            },
+            }
             // Found an opcode
             ParseResult::None => {
                 let offending_token = self.get_next_token();
                 self.add_error_message(&format!("number expected as argument."), offending_token);
                 return ParseResult::Error;
-            },
+            }
             ParseResult::Error => {
                 return ParseResult::Error;
-            },
+            }
             ParseResult::Done => {
                 return ParseResult::Done;
             }
         };
     }
 
-    fn parse_indirect_long(&mut self, opcode_token: &Token<'a>, opcode_name: &str) -> ParseResult<ParseNode<'a>> {
+    fn parse_indirect_long(
+        &mut self,
+        opcode_token: &Token<'a>,
+        opcode_name: &str,
+    ) -> ParseResult<ParseNode<'a>> {
         let left_bracket = self.get_next_token(); // Eat left bracket
 
         let argument = self.parse_argument();
@@ -257,22 +288,25 @@ impl<'a> Parser<'a> {
 
                     return ParseResult::Some(ParseNode {
                         start_token: opcode_token.clone(),
-                        expression: ParseExpression::IndirectLongInstruction(opcode_name.to_string(), result)
+                        expression: ParseExpression::IndirectLongInstruction(
+                            opcode_name.to_string(),
+                            result,
+                        ),
                     });
                 } else {
                     self.add_error_message(&format!("no closing bracket found."), left_bracket);
                     return ParseResult::Error;
                 }
-            },
+            }
             // Found an opcode
             ParseResult::None => {
                 let offending_token = self.get_next_token();
                 self.add_error_message(&format!("number expected as argument."), offending_token);
                 return ParseResult::Error;
-            },
+            }
             ParseResult::Error => {
                 return ParseResult::Error;
-            },
+            }
             ParseResult::Done => {
                 return ParseResult::Done;
             }
@@ -289,25 +323,24 @@ impl<'a> Parser<'a> {
             TokenType::NumberLiteral(number_literal) => {
                 self.get_next_token(); // Eat tokenNumberLiteral
                 ParseResult::Some(ParseArgument::NumberLiteral(number_literal))
-            },
+            }
             TokenType::Register(register_name) => {
                 self.get_next_token(); // Eat register token
                 ParseResult::Some(ParseArgument::Register(register_name))
-            },
-            TokenType::Opcode(_) => {
-                ParseResult::None
-            },
+            }
+            TokenType::Opcode(_) => ParseResult::None,
             TokenType::Invalid(invalid_token) => {
                 self.get_next_token(); // Eat token
                 self.add_invalid_token_message(invalid_token, lookahead);
                 ParseResult::Error
-            },
-            TokenType::EndOfFile => {
-                ParseResult::Done
-            },
+            }
+            TokenType::EndOfFile => ParseResult::Done,
             _ => {
                 self.get_next_token(); // Eat token
-                self.add_error_message(&format!("A number literal or register was expected here."), lookahead);
+                self.add_error_message(
+                    &format!("A number literal or register was expected here."),
+                    lookahead,
+                );
                 ParseResult::Error
             }
         }
@@ -329,7 +362,7 @@ impl<'a> Parser<'a> {
         let new_message = ErrorMessage {
             message: error_message.to_owned(),
             token: offending_token,
-            severity: ErrorSeverity::Error
+            severity: ErrorSeverity::Error,
         };
 
         self.error_messages.push(new_message);

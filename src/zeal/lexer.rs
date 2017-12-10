@@ -5,7 +5,7 @@ use zeal::system_definition::*;
 #[derive(PartialEq, Copy, Clone)]
 pub struct NumberLiteral {
     pub number: u32,
-    pub argument_size: ArgumentSize
+    pub argument_size: ArgumentSize,
 }
 
 #[derive(Clone, PartialEq)]
@@ -52,20 +52,22 @@ fn is_ascii_binary_digit(current_char: char) -> bool {
 }
 
 fn is_ascii_hex_digit(current_char: char) -> bool {
-    is_ascii_numeric(current_char)
-    || (current_char >= 'a' && current_char <= 'f')
-    || (current_char >= 'A' && current_char <= 'F')
+    is_ascii_numeric(current_char) || (current_char >= 'a' && current_char <= 'f')
+        || (current_char >= 'A' && current_char <= 'F')
 }
 
 fn is_ascii_alphanumeric(current_char: char) -> bool {
-    is_ascii_numeric(current_char)
-    || (current_char >= 'A' && current_char <= 'Z')
-    || (current_char >= 'a' && current_char <= 'z')
+    is_ascii_numeric(current_char) || (current_char >= 'A' && current_char <= 'Z')
+        || (current_char >= 'a' && current_char <= 'z')
 }
 
 impl<'a> Lexer<'a> {
-    pub fn new(system: &'static SystemDefinition, file_content: &'a str, source_file: String) -> Self {
-        Lexer{
+    pub fn new(
+        system: &'static SystemDefinition,
+        file_content: &'a str,
+        source_file: String,
+    ) -> Self {
+        Lexer {
             system: system,
             it: file_content.chars().peekable(),
             start_line: file_content.chars().peekable(),
@@ -105,39 +107,36 @@ impl<'a> Lexer<'a> {
         match current_char {
             'a'...'z' | 'A'...'Z' | '_' => {
                 return self.parse_identifier_or_similar();
-            },
+            }
             '#' => {
                 return self.new_simple_token(TokenType::Immediate);
-            },
+            }
             '$' => {
                 return self.parse_hex_number();
-            },
+            }
             ',' => {
                 return self.new_simple_token(TokenType::Comma);
-            },
+            }
             '(' => {
                 return self.new_simple_token(TokenType::LeftParen);
-            },
+            }
             ')' => {
                 return self.new_simple_token(TokenType::RightParen);
-            },
+            }
             '[' => {
                 return self.new_simple_token(TokenType::LeftBracket);
-            },
+            }
             ']' => {
                 return self.new_simple_token(TokenType::RightBracket);
-            },
+            }
             '%' => {
                 return self.parse_binary_number();
-            },
-            _ => {
-                if is_ascii_numeric(current_char) {
-                    return self.parse_number();
-                }
-                else {
-                    return self.token_invalid();
-                }
             }
+            _ => if is_ascii_numeric(current_char) {
+                return self.parse_number();
+            } else {
+                return self.token_invalid();
+            },
         }
     }
 
@@ -145,8 +144,7 @@ impl<'a> Lexer<'a> {
         while let Some(&current_char) = self.peek() {
             if current_char == '\n' {
                 self.do_end_of_line();
-            }
-            else if !current_char.is_whitespace() {
+            } else if !current_char.is_whitespace() {
                 break;
             } else {
                 self.consume();
@@ -158,30 +156,26 @@ impl<'a> Lexer<'a> {
         let mut is_done = false;
         while !is_done {
             match self.peek() {
-                Some(&first_char) => {
-                    if first_char == '/' {
-                        match self.peek_lookahead(1) {
-                            Some(second_char) => {
-                                if second_char == '/' {
-                                    while let Some(&current_char) = self.peek() {
-                                        if current_char == '\n' {
-                                            self.do_end_of_line();
-                                            break;
-                                        } else {
-                                            self.consume();
-                                        }
-                                    }
+                Some(&first_char) => if first_char == '/' {
+                    match self.peek_lookahead(1) {
+                        Some(second_char) => if second_char == '/' {
+                            while let Some(&current_char) = self.peek() {
+                                if current_char == '\n' {
+                                    self.do_end_of_line();
+                                    break;
                                 } else {
-                                    is_done = true
+                                    self.consume();
                                 }
-                            },
-                            None => is_done = true
-                        }
-                    } else {
-                        is_done = true
+                            }
+                        } else {
+                            is_done = true
+                        },
+                        None => is_done = true,
                     }
+                } else {
+                    is_done = true
                 },
-                None => is_done = true
+                None => is_done = true,
             };
         }
     }
@@ -215,7 +209,7 @@ impl<'a> Lexer<'a> {
                 start_column: start_column,
                 end_column: end_column,
                 source_file: self.source_file.to_string(),
-                context_start: context_start
+                context_start: context_start,
             };
         } else if self.is_register(&parsed_identifier) {
             return Token {
@@ -224,7 +218,7 @@ impl<'a> Lexer<'a> {
                 start_column: start_column,
                 end_column: end_column,
                 source_file: self.source_file.to_string(),
-                context_start: context_start
+                context_start: context_start,
             };
         } else {
             return Token {
@@ -233,7 +227,7 @@ impl<'a> Lexer<'a> {
                 start_column: start_column,
                 end_column: end_column,
                 source_file: self.source_file.to_string(),
-                context_start: context_start
+                context_start: context_start,
             };
         }
     }
@@ -250,13 +244,11 @@ impl<'a> Lexer<'a> {
         loop {
             match self.peek() {
                 None => break,
-                Some(&current_char) => {
-                    if is_ascii_hex_digit(current_char) {
-                        parsed_number.push(self.consume().unwrap())
-                    } else {
-                        break;
-                    }
-                }
+                Some(&current_char) => if is_ascii_hex_digit(current_char) {
+                    parsed_number.push(self.consume().unwrap())
+                } else {
+                    break;
+                },
             }
         }
 
@@ -264,7 +256,7 @@ impl<'a> Lexer<'a> {
 
         let result_number = match u32::from_str_radix(&parsed_number, 16) {
             Ok(result) => result,
-            Err(_) => 0
+            Err(_) => 0,
         };
 
         let parsed_length = parsed_number.len();
@@ -281,10 +273,15 @@ impl<'a> Lexer<'a> {
 
         let number_literal = NumberLiteral {
             number: result_number,
-            argument_size: argument_size
+            argument_size: argument_size,
         };
 
-        self.new_token(TokenType::NumberLiteral(number_literal), start_column, end_column, context_start)
+        self.new_token(
+            TokenType::NumberLiteral(number_literal),
+            start_column,
+            end_column,
+            context_start,
+        )
     }
 
     fn parse_binary_number(&mut self) -> Token<'a> {
@@ -299,13 +296,11 @@ impl<'a> Lexer<'a> {
         loop {
             match self.peek() {
                 None => break,
-                Some(&current_char) => {
-                    if is_ascii_binary_digit(current_char) {
-                        parsed_number.push(self.consume().unwrap())
-                    } else {
-                        break;
-                    }
-                }
+                Some(&current_char) => if is_ascii_binary_digit(current_char) {
+                    parsed_number.push(self.consume().unwrap())
+                } else {
+                    break;
+                },
             }
         }
 
@@ -313,7 +308,7 @@ impl<'a> Lexer<'a> {
 
         let result_number = match u32::from_str_radix(&parsed_number, 2) {
             Ok(result) => result,
-            Err(_) => 0
+            Err(_) => 0,
         };
 
         let parsed_length = parsed_number.len();
@@ -330,10 +325,15 @@ impl<'a> Lexer<'a> {
 
         let number_literal = NumberLiteral {
             number: result_number,
-            argument_size: argument_size
+            argument_size: argument_size,
         };
 
-        self.new_token(TokenType::NumberLiteral(number_literal), start_column, end_column, context_start)
+        self.new_token(
+            TokenType::NumberLiteral(number_literal),
+            start_column,
+            end_column,
+            context_start,
+        )
     }
 
     fn parse_number(&mut self) -> Token<'a> {
@@ -346,13 +346,11 @@ impl<'a> Lexer<'a> {
         loop {
             match self.peek() {
                 None => break,
-                Some(&current_char) => {
-                    if is_ascii_numeric(current_char) {
-                        parsed_number.push(self.consume().unwrap())
-                    } else {
-                        break;
-                    }
-                }
+                Some(&current_char) => if is_ascii_numeric(current_char) {
+                    parsed_number.push(self.consume().unwrap())
+                } else {
+                    break;
+                },
             }
         }
 
@@ -360,7 +358,7 @@ impl<'a> Lexer<'a> {
 
         let result_number = match u32::from_str_radix(&parsed_number, 10) {
             Ok(result) => result,
-            Err(_) => 0
+            Err(_) => 0,
         };
 
         let argument_size = if result_number > 16777215 {
@@ -375,10 +373,15 @@ impl<'a> Lexer<'a> {
 
         let number_literal = NumberLiteral {
             number: result_number,
-            argument_size: argument_size
+            argument_size: argument_size,
         };
 
-        self.new_token(TokenType::NumberLiteral(number_literal), start_column, end_column, context_start)
+        self.new_token(
+            TokenType::NumberLiteral(number_literal),
+            start_column,
+            end_column,
+            context_start,
+        )
     }
 
     fn is_opcode(&self, identifier: &str) -> bool {
@@ -420,7 +423,12 @@ impl<'a> Lexer<'a> {
         let start_column = self.column - 1;
         let end_column = self.column;
 
-        self.new_token(TokenType::Invalid(invalid_char), start_column, end_column, context_start)
+        self.new_token(
+            TokenType::Invalid(invalid_char),
+            start_column,
+            end_column,
+            context_start,
+        )
     }
 
     fn token_eof(&mut self) -> Token<'a> {
@@ -428,7 +436,12 @@ impl<'a> Lexer<'a> {
         let end_column = self.column;
         let context_start = self.start_line.clone();
 
-        self.new_token(TokenType::EndOfFile, start_column, end_column, context_start)
+        self.new_token(
+            TokenType::EndOfFile,
+            start_column,
+            end_column,
+            context_start,
+        )
     }
 
     fn new_simple_token(&mut self, ttype: TokenType) -> Token<'a> {
@@ -439,14 +452,20 @@ impl<'a> Lexer<'a> {
         return self.new_token(ttype, start_column, end_column, context_start);
     }
 
-    fn new_token(&mut self, ttype: TokenType, start_column: u32, end_column: u32, context_start: Peekable<Chars<'a>>) -> Token<'a> {
+    fn new_token(
+        &mut self,
+        ttype: TokenType,
+        start_column: u32,
+        end_column: u32,
+        context_start: Peekable<Chars<'a>>,
+    ) -> Token<'a> {
         Token {
             ttype: ttype,
             line: self.line,
             start_column: start_column,
             end_column: end_column,
             source_file: self.source_file.to_string(),
-            context_start: context_start
+            context_start: context_start,
         }
     }
 
@@ -456,13 +475,13 @@ impl<'a> Lexer<'a> {
             Some(result) => Some(result),
         }
     }
-    
+
     fn peek_lookahead(&mut self, lookahead: usize) -> Option<char> {
         let mut skip_it = self.it.clone().skip(lookahead);
 
         match skip_it.next() {
             Some(result) => Some(result),
-            None => None
+            None => None,
         }
     }
 
