@@ -18,3 +18,7 @@ lda ($02)
 lda [$af]
 // Direct Page indexed indirect
 lda ($1f,x)
+// Indirect indexed
+lda ($dc),y
+// Indirect indexed long
+lda [$ff],y

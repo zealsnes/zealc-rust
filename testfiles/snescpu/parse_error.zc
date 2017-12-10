@@ -14,3 +14,5 @@ lda ($ac,x
 lda #$06
 // Wrong register for indexed indirect
 lda ($ac,y)
+// No register argument
+lda ($dc),
