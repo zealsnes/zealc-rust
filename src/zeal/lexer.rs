@@ -17,6 +17,10 @@ pub enum TokenType {
     Register(String),
     Comma,
     Immediate,
+    LeftParen,
+    RightParen,
+    LeftBracket,
+    RightBracket,
     EndOfFile,
 }
 
@@ -103,21 +107,25 @@ impl<'a> Lexer<'a> {
                 return self.parse_identifier_or_similar();
             },
             '#' => {
-                let context_start = self.start_line.clone();
-                let start_column = self.column;
-                self.consume();
-                let end_column = self.column;
-                return self.new_token(TokenType::Immediate, start_column, end_column, context_start);
+                return self.new_simple_token(TokenType::Immediate);
             },
             '$' => {
                 return self.parse_hex_number();
             },
             ',' => {
-                let context_start = self.start_line.clone();
-                let start_column = self.column;
-                self.consume();
-                let end_column = self.column;
-                return self.new_token(TokenType::Comma, start_column, end_column, context_start);
+                return self.new_simple_token(TokenType::Comma);
+            },
+            '(' => {
+                return self.new_simple_token(TokenType::LeftParen);
+            },
+            ')' => {
+                return self.new_simple_token(TokenType::RightParen);
+            },
+            '[' => {
+                return self.new_simple_token(TokenType::LeftBracket);
+            },
+            ']' => {
+                return self.new_simple_token(TokenType::RightBracket);
             },
             '%' => {
                 return self.parse_binary_number();
@@ -421,6 +429,14 @@ impl<'a> Lexer<'a> {
         let context_start = self.start_line.clone();
 
         self.new_token(TokenType::EndOfFile, start_column, end_column, context_start)
+    }
+
+    fn new_simple_token(&mut self, ttype: TokenType) -> Token<'a> {
+        let context_start = self.start_line.clone();
+        let start_column = self.column;
+        self.consume();
+        let end_column = self.column;
+        return self.new_token(ttype, start_column, end_column, context_start);
     }
 
     fn new_token(&mut self, ttype: TokenType, start_column: u32, end_column: u32, context_start: Peekable<Chars<'a>>) -> Token<'a> {

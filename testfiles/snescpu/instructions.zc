@@ -12,3 +12,7 @@ lda $05,x
 lda $2140,x
 lda $7e0040,x
 lda $2140,y
+// Direct Page indirect
+lda ($02)
+// Direct Page indirect long
+lda [$af]

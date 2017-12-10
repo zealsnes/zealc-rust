@@ -10,8 +10,7 @@ pub enum ParseArgument {
 #[derive(Clone)]
 pub enum Statement {
     ImpliedInstruction(&'static InstructionInfo),
-    SingleArgumentInstruction(&'static InstructionInfo, ParseArgument),
-    IndexedInstruction(&'static InstructionInfo, ParseArgument),
+    SingleArgumentInstruction(&'static InstructionInfo, ParseArgument)
 }
 
 #[derive(Clone)]
@@ -20,6 +19,8 @@ pub enum ParseExpression {
     ImmediateInstruction(String, ParseArgument),
     SingleArgumentInstruction(String, ParseArgument),
     IndexedInstruction(String, ParseArgument, ParseArgument),
+    IndirectInstruction(String, ParseArgument),
+    IndirectLongInstruction(String, ParseArgument),
     Statement(Statement)
 }
 
@@ -105,26 +106,23 @@ impl<'a> Parser<'a> {
         //    | OPCODE '#' argument #Immediate
         //    | OPCODE argument #SingleArgument
         //    | OPCODE argument,register #Indexed
+        //    | OPCODE (argument) #Indirect
+        //    | OPCODE [argument] #IndirectLong
         //    ;
 
         let lookahead = self.lookahead();
 
-        let mut is_immediate = false;
         if lookahead.ttype == TokenType::Immediate {
-            self.get_next_token();
-            is_immediate = true;
-        }
+            return self.parse_immediate(opcode_token, opcode_name);
+        } else if lookahead.ttype == TokenType::LeftParen {
+            return self.parse_indirect(opcode_token, opcode_name);
+        } else if lookahead.ttype == TokenType::LeftBracket {
+            return self.parse_indirect_long(opcode_token, opcode_name);
+        } else {
+            let argument = self.parse_argument();
 
-        let argument = self.parse_argument();
-
-        match argument {
-            ParseResult::Some(result) => {
-                if is_immediate {
-                    return ParseResult::Some(ParseNode {
-                        start_token: opcode_token.clone(),
-                        expression: ParseExpression::ImmediateInstruction(opcode_name.to_string(), result)
-                    });
-                } else {
+            match argument {
+                ParseResult::Some(result) => {
                     let comma = self.lookahead();
                     if comma.ttype == TokenType::Comma {
                         self.get_next_token();
@@ -165,19 +163,118 @@ impl<'a> Parser<'a> {
                         start_token: opcode_token.clone(),
                         expression: ParseExpression::SingleArgumentInstruction(opcode_name.to_string(), result)
                     });
+                },
+                ParseResult::None => {
+                    return ParseResult::Some(ParseNode {
+                        start_token: opcode_token.clone(),
+                        expression: ParseExpression::ImpliedInstruction(opcode_name.to_string())
+                    });
+                },
+                ParseResult::Error => {
+                    return ParseResult::Error;
+                },
+                ParseResult::Done => {
+                    return ParseResult::Done;
                 }
-            },
-            ParseResult::None => {
+            };
+        }
+    }
+
+    fn parse_immediate(&mut self, opcode_token: &Token<'a>, opcode_name: &str) -> ParseResult<ParseNode<'a>> {
+         self.get_next_token();
+
+        let argument = self.parse_argument();
+
+        match argument {
+            ParseResult::Some(result) => {
                 return ParseResult::Some(ParseNode {
                     start_token: opcode_token.clone(),
-                    expression: ParseExpression::ImpliedInstruction(opcode_name.to_string())
+                    expression: ParseExpression::ImmediateInstruction(opcode_name.to_string(), result)
                 });
             },
+            // Found an opcode
+            ParseResult::None => {
+                let offending_token = self.get_next_token();
+                self.add_error_message(&format!("number expected as argument."), offending_token);
+                return ParseResult::Error;
+            },
             ParseResult::Error => {
-                return ParseResult::Error
+                return ParseResult::Error;
             },
             ParseResult::Done => {
-                return ParseResult::Done
+                return ParseResult::Done;
+            }
+        };
+    }
+
+    fn parse_indirect(&mut self, opcode_token: &Token<'a>, opcode_name: &str) -> ParseResult<ParseNode<'a>> {
+        let left_paren = self.get_next_token(); // Eat left parenthesis
+
+        let argument = self.parse_argument();
+
+        match argument {
+            ParseResult::Some(result) => {
+                let lookahead = self.lookahead();
+
+                if lookahead.ttype == TokenType::RightParen {
+                    self.get_next_token(); // Eat right parenthesis
+
+                    return ParseResult::Some(ParseNode {
+                        start_token: opcode_token.clone(),
+                        expression: ParseExpression::IndirectInstruction(opcode_name.to_string(), result)
+                    });
+                } else {
+                    self.add_error_message(&format!("no closing parenthesis found."), left_paren);
+                    return ParseResult::Error;
+                }
+            },
+            // Found an opcode
+            ParseResult::None => {
+                let offending_token = self.get_next_token();
+                self.add_error_message(&format!("number expected as argument."), offending_token);
+                return ParseResult::Error;
+            },
+            ParseResult::Error => {
+                return ParseResult::Error;
+            },
+            ParseResult::Done => {
+                return ParseResult::Done;
+            }
+        };
+    }
+
+    fn parse_indirect_long(&mut self, opcode_token: &Token<'a>, opcode_name: &str) -> ParseResult<ParseNode<'a>> {
+        let left_bracket = self.get_next_token(); // Eat left bracket
+
+        let argument = self.parse_argument();
+
+        match argument {
+            ParseResult::Some(result) => {
+                let lookahead = self.lookahead();
+
+                if lookahead.ttype == TokenType::RightBracket {
+                    self.get_next_token(); // Eat right bracket
+
+                    return ParseResult::Some(ParseNode {
+                        start_token: opcode_token.clone(),
+                        expression: ParseExpression::IndirectLongInstruction(opcode_name.to_string(), result)
+                    });
+                } else {
+                    self.add_error_message(&format!("no closing bracket found."), left_bracket);
+                    return ParseResult::Error;
+                }
+            },
+            // Found an opcode
+            ParseResult::None => {
+                let offending_token = self.get_next_token();
+                self.add_error_message(&format!("number expected as argument."), offending_token);
+                return ParseResult::Error;
+            },
+            ParseResult::Error => {
+                return ParseResult::Error;
+            },
+            ParseResult::Done => {
+                return ParseResult::Done;
             }
         };
     }

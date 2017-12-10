@@ -54,16 +54,6 @@ impl<'a> OutputWriter {
                     },
                     _ => {}
                 }
-            },
-            &Statement::IndexedInstruction(instruction, ref argument) => {
-                self.output.write_u8(instruction.opcode).unwrap();
-
-                match argument {
-                    &ParseArgument::NumberLiteral(ref number) => {
-                        self.write_number_literal(&number)
-                    },
-                    _ => {}
-                }
             }
         }
     }

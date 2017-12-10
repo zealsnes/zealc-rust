@@ -188,13 +188,57 @@ impl<'a> TreePass<'a> for InstructionToStatementPass<'a> {
                         Some(instruction) => {
                             new_tree.push(ParseNode {
                                 start_token: node.start_token.clone(),
-                                expression: ParseExpression::Statement(Statement::IndexedInstruction(instruction, argument1.clone()))
+                                expression: ParseExpression::Statement(Statement::SingleArgumentInstruction(instruction, argument1.clone()))
                             });
                         },
                         None => {
                             self.add_error_message(&format!("opcode '{}' does not support '{}' indexed addressing mode.", opcode_name, result_register_name), node.start_token.clone());
                             new_tree.push(node.clone());
                         }
+                    }
+                },
+                ParseExpression::IndirectInstruction(ref opcode_name, ref argument) => {
+                    match argument {
+                        &ParseArgument::NumberLiteral(number) => {
+                             match self.find_suitable_instruction(opcode_name, &[AddressingMode::Indirect], &[InstructionArgument::Number(number.argument_size)]) {
+                                Some(instruction) => {
+                                    new_tree.push(ParseNode {
+                                        start_token: node.start_token.clone(),
+                                        expression: ParseExpression::Statement(Statement::SingleArgumentInstruction(instruction, argument.clone()))
+                                    });
+                                },
+                                None => {
+                                    self.add_error_message(&format!("opcode '{}' does not support indirect addressing mode.", opcode_name), node.start_token.clone());
+                                    new_tree.push(node.clone());
+                                }
+                            }
+                        },
+                       &ParseArgument::Register(ref register_name) => {
+                           self.add_error_message(&format!("addressing mode does not support '{}' register argument.", register_name), node.start_token.clone());
+                           new_tree.push(node.clone());
+                       }
+                    }
+                },
+                ParseExpression::IndirectLongInstruction(ref opcode_name, ref argument) => {
+                    match argument {
+                        &ParseArgument::NumberLiteral(number) => {
+                             match self.find_suitable_instruction(opcode_name, &[AddressingMode::IndirectLong], &[InstructionArgument::Number(number.argument_size)]) {
+                                Some(instruction) => {
+                                    new_tree.push(ParseNode {
+                                        start_token: node.start_token.clone(),
+                                        expression: ParseExpression::Statement(Statement::SingleArgumentInstruction(instruction, argument.clone()))
+                                    });
+                                },
+                                None => {
+                                    self.add_error_message(&format!("opcode '{}' does not support indirect long addressing mode.", opcode_name), node.start_token.clone());
+                                    new_tree.push(node.clone());
+                                }
+                            }
+                        },
+                       &ParseArgument::Register(ref register_name) => {
+                           self.add_error_message(&format!("addressing mode does not support '{}' register argument.", register_name), node.start_token.clone());
+                           new_tree.push(node.clone());
+                       }
                     }
                 },
                 _=> {
