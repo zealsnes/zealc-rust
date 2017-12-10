@@ -192,7 +192,12 @@ impl<'a> TreePass<'a> for InstructionToStatementPass<'a> {
                             });
                         },
                         None => {
-                            self.add_error_message(&format!("opcode '{}' does not support '{}' indexed addressing mode.", opcode_name, result_register_name), node.start_token.clone());
+                            if result_register_name == "s" {
+                                self.add_error_message(&format!("opcode '{}' does not support stack relative mode.", opcode_name), node.start_token.clone());
+                            }
+                            else {
+                                self.add_error_message(&format!("opcode '{}' does not support '{}' indexed addressing mode.", opcode_name, result_register_name), node.start_token.clone());
+                            }
                             new_tree.push(node.clone());
                         }
                     }

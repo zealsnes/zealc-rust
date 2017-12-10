@@ -25,3 +25,5 @@ lda [$ff],y
 // Block move
 mvp $2c,$2d
 mvn $0f,$10
+// Stack relative
+lda $0c,s
