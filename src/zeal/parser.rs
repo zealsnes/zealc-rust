@@ -21,6 +21,7 @@ pub enum ParseExpression {
     IndexedInstruction(String, ParseArgument, ParseArgument),
     IndirectInstruction(String, ParseArgument),
     IndirectLongInstruction(String, ParseArgument),
+    IndexedIndirectInstruction(String, ParseArgument, ParseArgument),
     Statement(Statement),
 }
 
@@ -84,8 +85,8 @@ impl<'a> Parser<'a> {
         return parsed_tree;
     }
 
+    // root : (cpuInstruction)* ;
     fn parse(&mut self) -> ParseResult<ParseNode<'a>> {
-        // root : (cpuInstruction)* ;
         let token = self.get_next_token();
         match token.ttype {
             TokenType::EndOfFile => return ParseResult::Done,
@@ -101,19 +102,19 @@ impl<'a> Parser<'a> {
         }
     }
 
+    // cpuInstruction : OPCODE #Implied
+    //    | OPCODE '#' argument #Immediate
+    //    | OPCODE argument #SingleArgument
+    //    | OPCODE argument,register #Indexed
+    //    | OPCODE (argument) #Indirect
+    //    | OPCODE [argument] #IndirectLong
+    //    | OPCODE (argument,register) #IndexedIndirect
+    //    ;
     fn parse_cpu_instruction(
         &mut self,
         opcode_token: &Token<'a>,
         opcode_name: &str,
     ) -> ParseResult<ParseNode<'a>> {
-        // cpuInstruction : OPCODE #Implied
-        //    | OPCODE '#' argument #Immediate
-        //    | OPCODE argument #SingleArgument
-        //    | OPCODE argument,register #Indexed
-        //    | OPCODE (argument) #Indirect
-        //    | OPCODE [argument] #IndirectLong
-        //    ;
-
         let lookahead = self.lookahead();
 
         if lookahead.ttype == TokenType::Immediate {
@@ -250,6 +251,44 @@ impl<'a> Parser<'a> {
                             result,
                         ),
                     });
+                } else if lookahead.ttype == TokenType::Comma {
+                    self.get_next_token(); // Eat comma
+
+                    let second_argument = self.parse_argument();
+
+                    match second_argument {
+                        ParseResult::Some(second_result) => {
+                            let second_lookahead = self.lookahead();
+                            if second_lookahead.ttype == TokenType::RightParen {
+                                self.get_next_token(); // Eat right parenthesis
+
+                                return ParseResult::Some(ParseNode {
+                                    start_token: opcode_token.clone(),
+                                    expression: ParseExpression::IndexedIndirectInstruction(
+                                        opcode_name.to_string(),
+                                        result,
+                                        second_result,
+                                    ),
+                                });
+                            } else {
+                                self.add_error_message(
+                                    &format!("no closing parenthesis found."),
+                                    left_paren,
+                                );
+                                return ParseResult::Error;
+                            }
+                        }
+                        ParseResult::None => {
+                            let offending_token = self.get_next_token();
+                            self.add_error_message(
+                                &format!("register expected as argument."),
+                                offending_token,
+                            );
+                            return ParseResult::Error;
+                        }
+                        ParseResult::Done => return ParseResult::Done,
+                        ParseResult::Error => return ParseResult::Error,
+                    }
                 } else {
                     self.add_error_message(&format!("no closing parenthesis found."), left_paren);
                     return ParseResult::Error;
@@ -313,11 +352,10 @@ impl<'a> Parser<'a> {
         };
     }
 
+    // argument : NUMBER_LITERAL
+    //          | REGISTER
+    //          ;
     fn parse_argument(&mut self) -> ParseResult<ParseArgument> {
-        // argument : NUMBER_LITERAL
-        //          | REGISTER
-        //          ;
-
         let lookahead = self.lookahead();
         match lookahead.ttype {
             TokenType::NumberLiteral(number_literal) => {

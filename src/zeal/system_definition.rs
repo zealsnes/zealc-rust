@@ -23,6 +23,7 @@ pub enum AddressingMode {
     Indexed,
     Indirect,
     IndirectLong,
+    IndexedIndirect,
 }
 
 pub struct InstructionInfo {

@@ -16,3 +16,5 @@ lda $2140,y
 lda ($02)
 // Direct Page indirect long
 lda [$af]
+// Direct Page indexed indirect
+lda ($1f,x)
