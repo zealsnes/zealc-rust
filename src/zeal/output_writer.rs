@@ -53,6 +53,19 @@ impl<'a> OutputWriter {
                     _ => {}
                 }
             }
+            &Statement::TwoArgumentInstruction(instruction, ref argument1, ref argument2) => {
+                self.output.write_u8(instruction.opcode).unwrap();
+
+                match argument1 {
+                    &ParseArgument::NumberLiteral(ref number) => self.write_number_literal(&number),
+                    _ => {}
+                };
+
+                match argument2 {
+                    &ParseArgument::NumberLiteral(ref number) => self.write_number_literal(&number),
+                    _ => {}
+                };
+            }
         }
     }
 

@@ -352,6 +352,40 @@ impl<'a> TreePass<'a> for InstructionToStatementPass<'a> {
                         }
                     }
                 },
+                ParseExpression::BlockMoveInstruction(ref opcode_name, ref argument1, ref argument2) => {
+                    let mut argument_list = Vec::new();
+
+                    match argument1 {
+                        &ParseArgument::NumberLiteral(number) => {
+                            argument_list.push(InstructionArgument::Number(number.argument_size));
+                        },
+                        &ParseArgument::Register(ref register_name) => {
+                           argument_list.push(InstructionArgument::NotStaticRegister(register_name.to_owned()));
+                       }
+                    };
+
+                    match argument2 {
+                        &ParseArgument::NumberLiteral(number) => {
+                            argument_list.push(InstructionArgument::Number(number.argument_size));
+                        },
+                        &ParseArgument::Register(ref register_name) => {
+                            argument_list.push(InstructionArgument::NotStaticRegister(register_name.to_owned()));
+                       }
+                    };
+
+                    match self.find_suitable_instruction(opcode_name, &[AddressingMode::BlockMove], &argument_list) {
+                        Some(instruction) => {
+                            new_tree.push(ParseNode {
+                                start_token: node.start_token.clone(),
+                                expression: ParseExpression::Statement(Statement::TwoArgumentInstruction(instruction, argument1.clone(), argument2.clone()))
+                            });
+                        },
+                        None => {
+                            self.add_error_message(&format!("opcode '{}' does not support block mode addressing mode.", opcode_name), node.start_token.clone());
+                            new_tree.push(node.clone());
+                        }
+                    }
+                },
                 _=> {
                     new_tree.push(node.clone());
                 }

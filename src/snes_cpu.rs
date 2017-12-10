@@ -48,5 +48,9 @@ pub static SNES_CPU: SystemDefinition = SystemDefinition {
         InstructionInfo { name: "lda", addressing: AddressingMode::IndirectIndexed, opcode: 0xB1, arguments: &[InstructionArgument::Number(ArgumentSize::Word8), InstructionArgument::Register("y")]},
         // lda [dp],y
         InstructionInfo { name: "lda", addressing: AddressingMode::IndirectIndexedLong, opcode: 0xB7, arguments: &[InstructionArgument::Number(ArgumentSize::Word8), InstructionArgument::Register("y")]},
+        // mvp byte,byte
+        InstructionInfo { name: "mvp", addressing: AddressingMode::BlockMove, opcode: 0x44, arguments: &[InstructionArgument::Number(ArgumentSize::Word8), InstructionArgument::Number(ArgumentSize::Word8)]},
+        // mvn byte,byte
+        InstructionInfo { name: "mvn", addressing: AddressingMode::BlockMove, opcode: 0x54, arguments: &[InstructionArgument::Number(ArgumentSize::Word8), InstructionArgument::Number(ArgumentSize::Word8)]},
     ],
 };

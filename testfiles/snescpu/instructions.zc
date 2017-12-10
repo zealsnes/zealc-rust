@@ -22,3 +22,6 @@ lda ($1f,x)
 lda ($dc),y
 // Indirect indexed long
 lda [$ff],y
+// Block move
+mvp $2c,$2d
+mvn $0f,$10

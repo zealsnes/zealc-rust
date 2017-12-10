@@ -11,6 +11,7 @@ pub enum ParseArgument {
 pub enum Statement {
     ImpliedInstruction(&'static InstructionInfo),
     SingleArgumentInstruction(&'static InstructionInfo, ParseArgument),
+    TwoArgumentInstruction(&'static InstructionInfo, ParseArgument, ParseArgument),
 }
 
 #[derive(Clone)]
@@ -24,6 +25,7 @@ pub enum ParseExpression {
     IndexedIndirectInstruction(String, ParseArgument, ParseArgument),
     IndirectIndexedInstruction(String, ParseArgument, ParseArgument),
     IndirectIndexedLongInstruction(String, ParseArgument, ParseArgument),
+    BlockMoveInstruction(String, ParseArgument, ParseArgument),
     Statement(Statement),
 }
 
@@ -154,7 +156,35 @@ impl<'a> Parser<'a> {
                                     }
                                     ParseResult::None => {
                                         self.add_error_message(
-                                            &format!("expected register as second argument."),
+                                            &format!(
+                                                "expected register or register as second argument."
+                                            ),
+                                            opcode_token.clone(),
+                                        );
+                                        return ParseResult::Error;
+                                    }
+                                    ParseResult::Error => return ParseResult::Error,
+                                    ParseResult::Done => return ParseResult::Done,
+                                }
+                            }
+                            TokenType::NumberLiteral(_) => {
+                                let second_argument = self.parse_argument();
+                                match second_argument {
+                                    ParseResult::Some(second_result) => {
+                                        return ParseResult::Some(ParseNode {
+                                            start_token: opcode_token.clone(),
+                                            expression: ParseExpression::BlockMoveInstruction(
+                                                opcode_name.to_string(),
+                                                result,
+                                                second_result,
+                                            ),
+                                        });
+                                    }
+                                    ParseResult::None => {
+                                        self.add_error_message(
+                                            &format!(
+                                                "expected number or register as second argument."
+                                            ),
                                             opcode_token.clone(),
                                         );
                                         return ParseResult::Error;
@@ -166,7 +196,7 @@ impl<'a> Parser<'a> {
                             _ => {
                                 self.get_next_token();
                                 self.add_error_message(
-                                    &format!("expected register as second argument."),
+                                    &format!("expected number or register as second argument."),
                                     opcode_token.clone(),
                                 );
                                 return ParseResult::Error;
