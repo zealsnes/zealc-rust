@@ -41,6 +41,7 @@ pub struct SystemDefinition {
     pub short_name: &'static str,
     pub name: &'static str,
     pub is_big_endian: bool,
+    pub label_size: ArgumentSize,
     pub registers: &'static [&'static str],
     pub size_to_addressing_mode: fn(ArgumentSize) -> &'static str,
     pub instructions: &'static [InstructionInfo],
@@ -52,5 +53,14 @@ pub fn argument_size_to_bit_size(size: ArgumentSize) -> i32 {
         ArgumentSize::Word16 => 16,
         ArgumentSize::Word24 => 24,
         ArgumentSize::Word32 => 32,
+    }
+}
+
+pub fn argument_size_to_byte_size(size: ArgumentSize) -> u32 {
+    match size {
+        ArgumentSize::Word8 => 1,
+        ArgumentSize::Word16 => 2,
+        ArgumentSize::Word24 => 3,
+        ArgumentSize::Word32 => 4,
     }
 }

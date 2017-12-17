@@ -5,6 +5,7 @@ use zeal::system_definition::*;
 pub enum ParseArgument {
     NumberLiteral(NumberLiteral),
     Register(String),
+    Identifier(String)
 }
 
 #[derive(Clone)]
@@ -28,6 +29,7 @@ pub enum ParseExpression {
     BlockMoveInstruction(String, ParseArgument, ParseArgument),
     StackRelativeIndirectIndexedInstruction(String, ParseArgument, ParseArgument, ParseArgument),
     Statement(Statement),
+    Label(String),
 }
 
 #[derive(Clone)]
@@ -90,12 +92,15 @@ impl<'a> Parser<'a> {
         return parsed_tree;
     }
 
-    // root : (cpuInstruction)* ;
+    // root : (cpuInstruction)* | label* ;
     fn parse(&mut self) -> ParseResult<ParseNode<'a>> {
         let token = self.get_next_token();
         match token.ttype {
             TokenType::EndOfFile => return ParseResult::Done,
             TokenType::Opcode(ref opcode_name) => self.parse_cpu_instruction(&token, opcode_name),
+            TokenType::Identifier(ref label_name) => {
+                self.parse_label(&token, label_name)
+            }
             TokenType::Invalid(invalid_token) => {
                 self.add_invalid_token_message(invalid_token, token);
                 return ParseResult::Error;
@@ -483,6 +488,7 @@ impl<'a> Parser<'a> {
 
     // argument : NUMBER_LITERAL
     //          | REGISTER
+    //          | IDENTIFIER
     //          ;
     fn parse_argument(&mut self) -> ParseResult<ParseArgument> {
         let lookahead = self.lookahead();
@@ -494,6 +500,10 @@ impl<'a> Parser<'a> {
             TokenType::Register(register_name) => {
                 self.get_next_token(); // Eat register token
                 ParseResult::Some(ParseArgument::Register(register_name))
+            }
+            TokenType::Identifier(identifier) => {
+                self.get_next_token(); // Eat identifier token
+                ParseResult::Some(ParseArgument::Identifier(identifier))
             }
             TokenType::Opcode(_) => ParseResult::None,
             TokenType::Invalid(invalid_token) => {
@@ -510,6 +520,21 @@ impl<'a> Parser<'a> {
                 );
                 ParseResult::Error
             }
+        }
+    }
+
+    fn parse_label(&mut self, label_token: &Token<'a>, label_name: &str) -> ParseResult<ParseNode<'a>> {
+        let lookahead = self.lookahead();
+
+        if lookahead.ttype == TokenType::Colon {
+            self.get_next_token(); // Eat colon
+            return ParseResult::Some(ParseNode {
+                    start_token: label_token.clone(),
+                    expression: ParseExpression::Label(label_name.to_string()),
+                });
+        } else {
+            self.add_error_message(&"Expected a colon after this identifier.", label_token.clone());
+            return ParseResult::Error;
         }
     }
 

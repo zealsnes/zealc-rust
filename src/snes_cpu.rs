@@ -13,6 +13,7 @@ pub static SNES_CPU: SystemDefinition = SystemDefinition {
     short_name: "snes-cpu",
     name: "Super Nintendo/Super Famicom Ricoh 5A22 (65816 derivate)",
     is_big_endian: false,
+    label_size: ArgumentSize::Word16,
     registers: &["x", "y", "s"],
     size_to_addressing_mode: snes_argument_size_to_addressing_mode,
     instructions: &[

@@ -2,6 +2,7 @@ use zeal::lexer::Token;
 use zeal::parser::*;
 use zeal::system_definition::*;
 use zeal::pass::TreePass;
+use zeal::symbol_table::SymbolTable;
 
 pub struct InstructionToStatementPass<'a> {
     system: &'static SystemDefinition,
@@ -102,6 +103,9 @@ impl<'a> InstructionToStatementPass<'a> {
                 argument_list.push(InstructionArgument::NotStaticRegister(register_name.to_owned()));
                 return Some(result_register_name);
             }
+            &ParseArgument::Identifier(_) => {
+                return None;
+            }
         };
     }
 
@@ -113,6 +117,7 @@ impl<'a> InstructionToStatementPass<'a> {
             &ParseArgument::Register(ref register_name) => {
                 argument_list.push(InstructionArgument::NotStaticRegister(register_name.to_owned()));
             }
+            &ParseArgument::Identifier(_) => {}
         };
     }
 }
@@ -122,7 +127,7 @@ impl<'a> TreePass<'a> for InstructionToStatementPass<'a> {
         return !self.error_messages.is_empty()
     }
 
-    fn do_pass(&mut self, parse_tree: &Vec<ParseNode<'a>>) -> Vec<ParseNode<'a>> {
+    fn do_pass(&mut self, parse_tree: &Vec<ParseNode<'a>>, _symbol_table: &mut SymbolTable) -> Vec<ParseNode<'a>> {
         let mut new_tree:Vec<ParseNode<'a>> = Vec::new();
 
         for node in parse_tree.iter() {
@@ -161,6 +166,9 @@ impl<'a> TreePass<'a> for InstructionToStatementPass<'a> {
                            self.add_error_message(&format!("immediate addressing mode does not support '{}' register argument.", register_name), node.start_token.clone());
                            new_tree.push(node.clone());
                        }
+                       &ParseArgument::Identifier(_) => {
+                           new_tree.push(node.clone());
+                       }
                     }
                 },
                 ParseExpression::SingleArgumentInstruction(ref opcode_name, ref argument) => {
@@ -179,10 +187,13 @@ impl<'a> TreePass<'a> for InstructionToStatementPass<'a> {
                                 }
                             }
                         },
-                       &ParseArgument::Register(ref register_name) => {
-                           self.add_error_message(&format!("addressing mode does not support '{}' register argument.", register_name), node.start_token.clone());
-                           new_tree.push(node.clone());
-                       }
+                        &ParseArgument::Register(ref register_name) => {
+                            self.add_error_message(&format!("addressing mode does not support '{}' register argument.", register_name), node.start_token.clone());
+                            new_tree.push(node.clone());
+                        }
+                        &ParseArgument::Identifier(_) => {
+                            new_tree.push(node.clone());
+                        }
                     }
                 },
                 ParseExpression::IndexedInstruction(ref opcode_name, ref argument1, ref argument2) => {
@@ -233,9 +244,12 @@ impl<'a> TreePass<'a> for InstructionToStatementPass<'a> {
                                 }
                             }
                         },
-                       &ParseArgument::Register(ref register_name) => {
+                        &ParseArgument::Register(ref register_name) => {
                            self.add_error_message(&format!("addressing mode does not support '{}' register argument.", register_name), node.start_token.clone());
                            new_tree.push(node.clone());
+                        }
+                        &ParseArgument::Identifier(_) => {
+                            new_tree.push(node.clone());
                         }
                     }
                 },
@@ -255,10 +269,13 @@ impl<'a> TreePass<'a> for InstructionToStatementPass<'a> {
                                 }
                             }
                         },
-                       &ParseArgument::Register(ref register_name) => {
-                           self.add_error_message(&format!("addressing mode does not support '{}' register argument.", register_name), node.start_token.clone());
-                           new_tree.push(node.clone());
-                       }
+                        &ParseArgument::Register(ref register_name) => {
+                            self.add_error_message(&format!("addressing mode does not support '{}' register argument.", register_name), node.start_token.clone());
+                            new_tree.push(node.clone());
+                        },
+                        &ParseArgument::Identifier(_) => {
+                            new_tree.push(node.clone());
+                        }
                     }
                 },
                 ParseExpression::IndexedIndirectInstruction(ref opcode_name, ref argument1, ref argument2) => {

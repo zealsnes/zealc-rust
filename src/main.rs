@@ -10,12 +10,16 @@ use std::path::{Path, PathBuf};
 use std::io::prelude::*;
 
 use snes_cpu::*;
-use zeal::lexer::*;
-use zeal::pass::*;
-use zeal::parser::*;
+
+use zeal::collect_label_pass::*;
 use zeal::instruction_statement_pass::*;
-use zeal::system_definition::SystemDefinition;
+use zeal::lexer::*;
 use zeal::output_writer::*;
+use zeal::parser::*;
+use zeal::pass::*;
+use zeal::resolve_label_pass::*;
+use zeal::symbol_table::*;
+use zeal::system_definition::SystemDefinition;
 
 static SUPPORTED_SYSTEMS: &'static [&'static SystemDefinition] = &[&SNES_CPU];
 
@@ -186,8 +190,22 @@ fn main() {
         process_errors(&parser.error_messages);
     }
 
+    let mut symbol_table = SymbolTable::new();
+
+    let mut collect_label_pass = CollectLabelPass::new(selected_cpu,);
+    let collect_label_tree = collect_label_pass.do_pass(&parse_tree,  &mut symbol_table);
+    if collect_label_pass.has_errors() {
+        process_errors(&collect_label_pass.error_messages);
+    }
+
+    let mut resolve_label_pass = ResolveLabelPass::new(selected_cpu);
+    let resolve_label_tree = resolve_label_pass.do_pass(&collect_label_tree,  &mut symbol_table);
+    if resolve_label_pass.has_errors() {
+        process_errors(&resolve_label_pass.error_messages);
+    }
+
     let mut instruction_statement_pass = InstructionToStatementPass::new(selected_cpu);
-    let instruction_tree = instruction_statement_pass.do_pass(&parse_tree);
+    let instruction_tree = instruction_statement_pass.do_pass(&resolve_label_tree,  &mut symbol_table);
     if instruction_statement_pass.has_errors() {
         process_errors(&instruction_statement_pass.error_messages);
     }

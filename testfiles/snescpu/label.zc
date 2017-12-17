@@ -1,0 +1,16 @@
+    jsr function
+
+    lda #123
+    ldx #0
+loop:
+    sta $00,x
+
+    inx
+    cpx #$08
+    bne loop
+
+function:
+    sta $2040
+    stx $2041
+    sty $2042
+    rts

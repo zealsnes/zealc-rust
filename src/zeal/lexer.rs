@@ -21,6 +21,7 @@ pub enum TokenType {
     RightParen,
     LeftBracket,
     RightBracket,
+    Colon,
     EndOfFile,
 }
 
@@ -131,6 +132,9 @@ impl<'a> Lexer<'a> {
             }
             '%' => {
                 return self.parse_binary_number();
+            }
+            ':' => {
+                return self.new_simple_token(TokenType::Colon);
             }
             _ => if is_ascii_numeric(current_char) {
                 return self.parse_number();
