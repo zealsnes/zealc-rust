@@ -15,6 +15,7 @@ pub enum TokenType {
     Opcode(String),
     NumberLiteral(NumberLiteral),
     Register(String),
+    KeywordOrigin,
     Comma,
     Immediate,
     LeftParen,
@@ -182,6 +183,7 @@ impl<'a> Lexer<'a> {
                 None => is_done = true,
             };
         }
+        self.eat_whitespaces();
     }
 
     fn parse_identifier_or_similar(&mut self) -> Token<'a> {
@@ -206,33 +208,52 @@ impl<'a> Lexer<'a> {
 
         let end_column = self.column;
 
-        if self.is_opcode(&parsed_identifier) {
-            return Token {
-                ttype: TokenType::Opcode(parsed_identifier),
-                line: self.line,
-                start_column: start_column,
-                end_column: end_column,
-                source_file: self.source_file.to_string(),
-                context_start: context_start,
-            };
-        } else if self.is_register(&parsed_identifier) {
-            return Token {
-                ttype: TokenType::Register(parsed_identifier),
-                line: self.line,
-                start_column: start_column,
-                end_column: end_column,
-                source_file: self.source_file.to_string(),
-                context_start: context_start,
-            };
-        } else {
-            return Token {
-                ttype: TokenType::Identifier(parsed_identifier),
-                line: self.line,
-                start_column: start_column,
-                end_column: end_column,
-                source_file: self.source_file.to_string(),
-                context_start: context_start,
-            };
+        match self.is_keyword(&parsed_identifier) {
+            Some(keyword) => {
+                return Token {
+                    ttype: keyword,
+                    line: self.line,
+                    start_column: start_column,
+                    end_column: end_column,
+                    source_file: self.source_file.to_string(),
+                    context_start: context_start,
+                };
+            }
+            None => if self.is_opcode(&parsed_identifier) {
+                return Token {
+                    ttype: TokenType::Opcode(parsed_identifier),
+                    line: self.line,
+                    start_column: start_column,
+                    end_column: end_column,
+                    source_file: self.source_file.to_string(),
+                    context_start: context_start,
+                };
+            } else if self.is_register(&parsed_identifier) {
+                return Token {
+                    ttype: TokenType::Register(parsed_identifier),
+                    line: self.line,
+                    start_column: start_column,
+                    end_column: end_column,
+                    source_file: self.source_file.to_string(),
+                    context_start: context_start,
+                };
+            } else {
+                return Token {
+                    ttype: TokenType::Identifier(parsed_identifier),
+                    line: self.line,
+                    start_column: start_column,
+                    end_column: end_column,
+                    source_file: self.source_file.to_string(),
+                    context_start: context_start,
+                };
+            },
+        }
+    }
+
+    fn is_keyword(&mut self, identifier: &str) -> Option<TokenType> {
+        match identifier {
+            "origin" => Some(TokenType::KeywordOrigin),
+            _ => None,
         }
     }
 

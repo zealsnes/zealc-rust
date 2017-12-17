@@ -9,7 +9,7 @@ pub enum ParseArgument {
 }
 
 #[derive(Clone)]
-pub enum Statement {
+pub enum FinalInstruction {
     ImpliedInstruction(&'static InstructionInfo),
     SingleArgumentInstruction(&'static InstructionInfo, ParseArgument),
     TwoArgumentInstruction(&'static InstructionInfo, ParseArgument, ParseArgument),
@@ -28,8 +28,9 @@ pub enum ParseExpression {
     IndirectIndexedLongInstruction(String, ParseArgument, ParseArgument),
     BlockMoveInstruction(String, ParseArgument, ParseArgument),
     StackRelativeIndirectIndexedInstruction(String, ParseArgument, ParseArgument, ParseArgument),
-    Statement(Statement),
+    FinalInstruction(FinalInstruction),
     Label(String),
+    OriginStatement(NumberLiteral),
 }
 
 #[derive(Clone)]
@@ -92,7 +93,7 @@ impl<'a> Parser<'a> {
         return parsed_tree;
     }
 
-    // root : (cpuInstruction)* | label* ;
+    // root : (cpuInstruction | label | origin_statement)*;
     fn parse(&mut self) -> ParseResult<ParseNode<'a>> {
         let token = self.get_next_token();
         match token.ttype {
@@ -100,6 +101,9 @@ impl<'a> Parser<'a> {
             TokenType::Opcode(ref opcode_name) => self.parse_cpu_instruction(&token, opcode_name),
             TokenType::Identifier(ref label_name) => {
                 self.parse_label(&token, label_name)
+            }
+            TokenType::KeywordOrigin => {
+                self.parse_origin_statement(&token)
             }
             TokenType::Invalid(invalid_token) => {
                 self.add_invalid_token_message(invalid_token, token);
@@ -523,6 +527,7 @@ impl<'a> Parser<'a> {
         }
     }
 
+    // label : IDENTIFIER ':'
     fn parse_label(&mut self, label_token: &Token<'a>, label_name: &str) -> ParseResult<ParseNode<'a>> {
         let lookahead = self.lookahead();
 
@@ -535,6 +540,31 @@ impl<'a> Parser<'a> {
         } else {
             self.add_error_message(&"Expected a colon after this identifier.", label_token.clone());
             return ParseResult::Error;
+        }
+    }
+
+    // origin_statement: 'origin' NUMBER_LITERAL
+    fn parse_origin_statement(&mut self, origin_token: &Token<'a>) -> ParseResult<ParseNode<'a>> {
+        let lookahead = self.lookahead();
+
+        match lookahead.ttype {
+            TokenType::NumberLiteral(number) => {
+                self.get_next_token(); // Eat literal
+                return ParseResult::Some(ParseNode {
+                    start_token: origin_token.clone(),
+                    expression: ParseExpression::OriginStatement(number),
+                });
+            }
+            TokenType::Invalid(invalid_token) => {
+                self.get_next_token(); // Eat token
+                self.add_invalid_token_message(invalid_token, lookahead);
+                ParseResult::Error
+            }
+            TokenType::EndOfFile => ParseResult::Done,
+            _ => {
+                self.add_error_message(&"Expected a number literal after origin keyword.", origin_token.clone());
+                ParseResult::Error
+            }
         }
     }
 

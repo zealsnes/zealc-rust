@@ -138,6 +138,7 @@ impl<'a> TreePass<'a> for ResolveLabelPass<'a> {
                                             let temp_address:i64 = (symbol_table.address_for(identifier) as i64) - ((current_address + argument_size_to_byte_size(argument_size)) as i64);
                                             if temp_address > (i8::max_value() as i64) || temp_address < (i8::min_value() as i64)
                                             {
+                                                println!("address: {}, current_address: {}", symbol_table.address_for(identifier), current_address);
                                                 self.add_error_message(&format!("Branch label '{0}' is too far away. Consider reducing the distance of the label.", identifier), node.start_token.clone());
                                             }
                                             else
@@ -459,6 +460,9 @@ impl<'a> TreePass<'a> for ResolveLabelPass<'a> {
                              new_tree.push(node.clone());
                         }
                     };
+                }
+                ParseExpression::OriginStatement(ref number) => {
+                    current_address = number.number;
                 }
                 _ => {
                     new_tree.push(node.clone());

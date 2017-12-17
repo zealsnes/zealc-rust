@@ -137,7 +137,7 @@ impl<'a> TreePass<'a> for InstructionToStatementPass<'a> {
                         Some(instruction) => {
                             new_tree.push(ParseNode {
                                 start_token: node.start_token.clone(),
-                                expression: ParseExpression::Statement(Statement::ImpliedInstruction(instruction))
+                                expression: ParseExpression::FinalInstruction(FinalInstruction::ImpliedInstruction(instruction))
                             });
                         },
                         None => {
@@ -153,7 +153,7 @@ impl<'a> TreePass<'a> for InstructionToStatementPass<'a> {
                                 Some(instruction) => {
                                     new_tree.push(ParseNode {
                                         start_token: node.start_token.clone(),
-                                        expression: ParseExpression::Statement(Statement::SingleArgumentInstruction(instruction, argument.clone()))
+                                        expression: ParseExpression::FinalInstruction(FinalInstruction::SingleArgumentInstruction(instruction, argument.clone()))
                                     });
                                 },
                                 None => {
@@ -178,7 +178,7 @@ impl<'a> TreePass<'a> for InstructionToStatementPass<'a> {
                                 Some(instruction) => {
                                     new_tree.push(ParseNode {
                                         start_token: node.start_token.clone(),
-                                        expression: ParseExpression::Statement(Statement::SingleArgumentInstruction(instruction, argument.clone()))
+                                        expression: ParseExpression::FinalInstruction(FinalInstruction::SingleArgumentInstruction(instruction, argument.clone()))
                                     });
                                 },
                                 None => {
@@ -214,7 +214,7 @@ impl<'a> TreePass<'a> for InstructionToStatementPass<'a> {
                         Some(instruction) => {
                             new_tree.push(ParseNode {
                                 start_token: node.start_token.clone(),
-                                expression: ParseExpression::Statement(Statement::SingleArgumentInstruction(instruction, argument1.clone()))
+                                expression: ParseExpression::FinalInstruction(FinalInstruction::SingleArgumentInstruction(instruction, argument1.clone()))
                             });
                         },
                         None => {
@@ -235,7 +235,7 @@ impl<'a> TreePass<'a> for InstructionToStatementPass<'a> {
                                 Some(instruction) => {
                                     new_tree.push(ParseNode {
                                         start_token: node.start_token.clone(),
-                                        expression: ParseExpression::Statement(Statement::SingleArgumentInstruction(instruction, argument.clone()))
+                                        expression: ParseExpression::FinalInstruction(FinalInstruction::SingleArgumentInstruction(instruction, argument.clone()))
                                     });
                                 },
                                 None => {
@@ -260,7 +260,7 @@ impl<'a> TreePass<'a> for InstructionToStatementPass<'a> {
                                 Some(instruction) => {
                                     new_tree.push(ParseNode {
                                         start_token: node.start_token.clone(),
-                                        expression: ParseExpression::Statement(Statement::SingleArgumentInstruction(instruction, argument.clone()))
+                                        expression: ParseExpression::FinalInstruction(FinalInstruction::SingleArgumentInstruction(instruction, argument.clone()))
                                     });
                                 },
                                 None => {
@@ -296,7 +296,7 @@ impl<'a> TreePass<'a> for InstructionToStatementPass<'a> {
                         Some(instruction) => {
                             new_tree.push(ParseNode {
                                 start_token: node.start_token.clone(),
-                                expression: ParseExpression::Statement(Statement::SingleArgumentInstruction(instruction, argument1.clone()))
+                                expression: ParseExpression::FinalInstruction(FinalInstruction::SingleArgumentInstruction(instruction, argument1.clone()))
                             });
                         },
                         None => {
@@ -323,7 +323,7 @@ impl<'a> TreePass<'a> for InstructionToStatementPass<'a> {
                         Some(instruction) => {
                             new_tree.push(ParseNode {
                                 start_token: node.start_token.clone(),
-                                expression: ParseExpression::Statement(Statement::SingleArgumentInstruction(instruction, argument1.clone()))
+                                expression: ParseExpression::FinalInstruction(FinalInstruction::SingleArgumentInstruction(instruction, argument1.clone()))
                             });
                         },
                         None => {
@@ -350,7 +350,7 @@ impl<'a> TreePass<'a> for InstructionToStatementPass<'a> {
                         Some(instruction) => {
                             new_tree.push(ParseNode {
                                 start_token: node.start_token.clone(),
-                                expression: ParseExpression::Statement(Statement::SingleArgumentInstruction(instruction, argument1.clone()))
+                                expression: ParseExpression::FinalInstruction(FinalInstruction::SingleArgumentInstruction(instruction, argument1.clone()))
                             });
                         },
                         None => {
@@ -369,7 +369,7 @@ impl<'a> TreePass<'a> for InstructionToStatementPass<'a> {
                         Some(instruction) => {
                             new_tree.push(ParseNode {
                                 start_token: node.start_token.clone(),
-                                expression: ParseExpression::Statement(Statement::TwoArgumentInstruction(instruction, argument1.clone(), argument2.clone()))
+                                expression: ParseExpression::FinalInstruction(FinalInstruction::TwoArgumentInstruction(instruction, argument1.clone(), argument2.clone()))
                             });
                         },
                         None => {
@@ -389,7 +389,7 @@ impl<'a> TreePass<'a> for InstructionToStatementPass<'a> {
                         Some(instruction) => {
                             new_tree.push(ParseNode {
                                 start_token: node.start_token.clone(),
-                                expression: ParseExpression::Statement(Statement::SingleArgumentInstruction(instruction, argument1.clone()))
+                                expression: ParseExpression::FinalInstruction(FinalInstruction::SingleArgumentInstruction(instruction, argument1.clone()))
                             });
                         },
                         None => {

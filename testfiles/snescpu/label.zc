@@ -1,3 +1,5 @@
+origin $9F0210
+
     jsr function
 
     lda #123
@@ -9,6 +11,7 @@ loop:
     cpx #$08
     bne loop
 
+origin $9FAAFF
 function:
     sta $2040
     stx $2041

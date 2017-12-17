@@ -454,6 +454,10 @@ impl<'a> TreePass<'a> for CollectLabelPass<'a> {
                         _ => {}
                     };
                 }
+                ParseExpression::OriginStatement(ref number) => {
+                    current_address = number.number;
+                    new_tree.push(node.clone());
+                }
                 ParseExpression::Label(ref label_name) => {
                     symbol_table.add_or_update_label(label_name, current_address);
                 }

@@ -32,20 +32,20 @@ impl<'a> OutputWriter {
     pub fn write(&mut self, parse_tree: &Vec<ParseNode<'a>>) {
         for node in parse_tree.iter() {
             match node.expression {
-                ParseExpression::Statement(ref statement) => {
-                    self.handle_statement(statement);
+                ParseExpression::FinalInstruction(ref final_instruction) => {
+                    self.handle_final_instruction(final_instruction);
                 }
                 _ => {}
             };
         }
     }
 
-    fn handle_statement(&mut self, statement: &Statement) {
-        match statement {
-            &Statement::ImpliedInstruction(instruction) => {
+    fn handle_final_instruction(&mut self, final_instruction: &FinalInstruction) {
+        match final_instruction {
+            &FinalInstruction::ImpliedInstruction(instruction) => {
                 self.output.write_u8(instruction.opcode).unwrap();
             }
-            &Statement::SingleArgumentInstruction(instruction, ref argument) => {
+            &FinalInstruction::SingleArgumentInstruction(instruction, ref argument) => {
                 self.output.write_u8(instruction.opcode).unwrap();
 
                 match argument {
@@ -53,7 +53,7 @@ impl<'a> OutputWriter {
                     _ => {}
                 }
             }
-            &Statement::TwoArgumentInstruction(instruction, ref argument1, ref argument2) => {
+            &FinalInstruction::TwoArgumentInstruction(instruction, ref argument1, ref argument2) => {
                 self.output.write_u8(instruction.opcode).unwrap();
 
                 match argument1 {
