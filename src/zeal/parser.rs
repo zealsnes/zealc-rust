@@ -132,7 +132,7 @@ impl<'a> Parser<'a> {
         opcode_token: &Token<'a>,
         opcode_name: &str,
     ) -> ParseResult<ParseNode<'a>> {
-        let lookahead = self.lookahead();
+        let lookahead = self.lookahead(1);
 
         if lookahead.ttype == TokenType::Immediate {
             return self.parse_immediate(opcode_token, opcode_name);
@@ -145,11 +145,11 @@ impl<'a> Parser<'a> {
 
             match argument {
                 ParseResult::Some(result) => {
-                    let comma = self.lookahead();
+                    let comma = self.lookahead(1);
                     if comma.ttype == TokenType::Comma {
                         self.get_next_token();
 
-                        let second_lookahead = self.lookahead();
+                        let second_lookahead = self.lookahead(1);
 
                         match second_lookahead.ttype {
                             TokenType::Register(_) => {
@@ -223,7 +223,7 @@ impl<'a> Parser<'a> {
                         ),
                     });
                 }
-                ParseResult::None => {
+                ParseResult::None | ParseResult::Done => {
                     return ParseResult::Some(ParseNode {
                         start_token: opcode_token.clone(),
                         expression: ParseExpression::ImpliedInstruction(opcode_name.to_string()),
@@ -231,9 +231,6 @@ impl<'a> Parser<'a> {
                 }
                 ParseResult::Error => {
                     return ParseResult::Error;
-                }
-                ParseResult::Done => {
-                    return ParseResult::Done;
                 }
             };
         }
@@ -286,12 +283,12 @@ impl<'a> Parser<'a> {
 
         match argument {
             ParseResult::Some(result) => {
-                let lookahead = self.lookahead();
+                let lookahead = self.lookahead(1);
 
                 if lookahead.ttype == TokenType::RightParen {
                     self.get_next_token(); // Eat right parenthesis
 
-                    let second_lookahead = self.lookahead();
+                    let second_lookahead = self.lookahead(1);
                     if second_lookahead.ttype == TokenType::Comma {
                         self.get_next_token(); // Eat comma
 
@@ -334,11 +331,11 @@ impl<'a> Parser<'a> {
 
                     match second_argument {
                         ParseResult::Some(second_result) => {
-                            let second_lookahead = self.lookahead();
+                            let second_lookahead = self.lookahead(1);
                             if second_lookahead.ttype == TokenType::RightParen {
                                 self.get_next_token(); // Eat right parenthesis
 
-                                let third_lookahead = self.lookahead();
+                                let third_lookahead = self.lookahead(1);
                                 if third_lookahead.ttype == TokenType::Comma {
                                     self.get_next_token(); // Eat comma
 
@@ -427,12 +424,12 @@ impl<'a> Parser<'a> {
 
         match argument {
             ParseResult::Some(result) => {
-                let lookahead = self.lookahead();
+                let lookahead = self.lookahead(1);
 
                 if lookahead.ttype == TokenType::RightBracket {
                     self.get_next_token(); // Eat right bracket
 
-                    let second_lookahead = self.lookahead();
+                    let second_lookahead = self.lookahead(1);
                     if second_lookahead.ttype == TokenType::Comma {
                         self.get_next_token(); // Eat comma
 
@@ -495,7 +492,7 @@ impl<'a> Parser<'a> {
     //          | IDENTIFIER
     //          ;
     fn parse_argument(&mut self) -> ParseResult<ParseArgument> {
-        let lookahead = self.lookahead();
+        let lookahead = self.lookahead(1);
         match lookahead.ttype {
             TokenType::NumberLiteral(number_literal) => {
                 self.get_next_token(); // Eat tokenNumberLiteral
@@ -506,8 +503,13 @@ impl<'a> Parser<'a> {
                 ParseResult::Some(ParseArgument::Register(register_name))
             }
             TokenType::Identifier(identifier) => {
-                self.get_next_token(); // Eat identifier token
-                ParseResult::Some(ParseArgument::Identifier(identifier))
+                let second_lookahead = self.lookahead(2);
+                if second_lookahead.ttype == TokenType::Colon {
+                    return ParseResult::None
+                } else {
+                    self.get_next_token(); // Eat identifier token
+                    ParseResult::Some(ParseArgument::Identifier(identifier))
+                }
             }
             TokenType::Opcode(_) => ParseResult::None,
             TokenType::Invalid(invalid_token) => {
@@ -529,7 +531,7 @@ impl<'a> Parser<'a> {
 
     // label : IDENTIFIER ':'
     fn parse_label(&mut self, label_token: &Token<'a>, label_name: &str) -> ParseResult<ParseNode<'a>> {
-        let lookahead = self.lookahead();
+        let lookahead = self.lookahead(1);
 
         if lookahead.ttype == TokenType::Colon {
             self.get_next_token(); // Eat colon
@@ -545,7 +547,7 @@ impl<'a> Parser<'a> {
 
     // origin_statement: 'origin' NUMBER_LITERAL
     fn parse_origin_statement(&mut self, origin_token: &Token<'a>) -> ParseResult<ParseNode<'a>> {
-        let lookahead = self.lookahead();
+        let lookahead = self.lookahead(1);
 
         match lookahead.ttype {
             TokenType::NumberLiteral(number) => {
@@ -568,8 +570,8 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn lookahead(&mut self) -> Token<'a> {
-        self.lexer().unwrap().lookahead()
+    fn lookahead(&mut self, times: u32) -> Token<'a> {
+        self.lexer().unwrap().lookahead(times)
     }
 
     fn get_next_token(&mut self) -> Token<'a> {

@@ -89,11 +89,15 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    pub fn lookahead(&mut self) -> Token<'a> {
+    pub fn lookahead(&mut self, times: u32) -> Token<'a> {
         let backup_line = self.line;
         let backup_column = self.column;
         let backup_it = self.it.clone();
         let backup_start_line = self.start_line.clone();
+
+        for _i in 0..(times-1) {
+            self.get_next_token();
+        }
 
         let lookahead = self.get_next_token();
 
