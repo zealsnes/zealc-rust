@@ -14,6 +14,7 @@ pub enum TokenType {
     Identifier(String),
     Opcode(String),
     NumberLiteral(NumberLiteral),
+    StringLiteral(String),
     Register(String),
     Comma,
     Immediate,
@@ -23,6 +24,7 @@ pub enum TokenType {
     RightBracket,
     Colon,
     EndOfFile,
+    KeywordIncbin,
     KeywordOrigin,
     KeywordSnesMap,
 }
@@ -41,7 +43,7 @@ pub struct Lexer<'a> {
     system: &'static SystemDefinition,
     it: Peekable<Chars<'a>>,
     start_line: Peekable<Chars<'a>>,
-    source_file: String,
+    pub source_file: String,
     line: u32,
     column: u32,
 }
@@ -114,6 +116,9 @@ impl<'a> Lexer<'a> {
         match current_char {
             'a'...'z' | 'A'...'Z' | '_' => {
                 return self.parse_identifier_or_similar();
+            }
+            '"' => {
+                return self.parse_string_literal();
             }
             '#' => {
                 return self.new_simple_token(TokenType::Immediate);
@@ -255,8 +260,57 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    fn parse_string_literal(&mut self) -> Token<'a> {
+        let context_start = self.start_line.clone();
+        let start_column = self.column;
+
+        let mut parsed_string = String::new();
+
+        // Eat first '"'
+        self.consume();
+
+        loop {
+            match self.peek() {
+                None => break,
+                Some(&current_char) => {
+                    if current_char != '"' {
+                        parsed_string.push(self.consume().unwrap())
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+
+        let end_lookahead = self.peek_lookahead(0);
+        match end_lookahead {
+            Some(result) => {
+                if result == '"' {
+                    self.consume();
+
+                    let end_column = self.column;
+
+                    return Token {
+                        ttype: TokenType::StringLiteral(parsed_string),
+                        line: self.line,
+                        start_column: start_column,
+                        end_column: end_column,
+                        source_file: self.source_file.to_string(),
+                        context_start: context_start,
+                    };
+                } else {
+                    self.token_invalid()
+                }
+            }
+            None => {
+                self.token_invalid()
+            }
+        }
+    }
+
     fn is_keyword(&mut self, identifier: &str) -> Option<TokenType> {
         match identifier {
+            "incbin" => Some(TokenType::KeywordIncbin),
             "origin" => Some(TokenType::KeywordOrigin),
             "snesmap" => Some(TokenType::KeywordSnesMap),
             _ => None,
@@ -392,15 +446,7 @@ impl<'a> Lexer<'a> {
             Err(_) => 0,
         };
 
-        let argument_size = if result_number > 16777215 {
-            ArgumentSize::Word32
-        } else if result_number > u16::max_value() as u32 {
-            ArgumentSize::Word24
-        } else if result_number > u8::max_value() as u32 {
-            ArgumentSize::Word16
-        } else {
-            ArgumentSize::Word8
-        };
+        let argument_size = number_to_argument_size(result_number);
 
         let number_literal = NumberLiteral {
             number: result_number,

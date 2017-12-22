@@ -1,7 +1,8 @@
 extern crate byteorder;
 
 use self::byteorder::{BigEndian, LittleEndian, WriteBytesExt};
-use std::io::{Seek, SeekFrom};
+use std::error::Error;
+use std::io::{BufReader, Read, Seek, SeekFrom, Write};
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::path::Path;
@@ -31,6 +32,7 @@ impl<'a> OutputWriter {
     pub fn new(system: &'static SystemDefinition, file_path: &Path) -> Self {
         let mut file_options = OpenOptions::new();
         file_options.write(true);
+        file_options.create_new(true);
 
         let file = match file_options.open(file_path) {
             Ok(file) => file,
@@ -49,6 +51,9 @@ impl<'a> OutputWriter {
             match node.expression {
                 ParseExpression::FinalInstruction(ref final_instruction) => {
                     self.handle_final_instruction(final_instruction);
+                }
+                ParseExpression::IncBinStatement(ref filename, _) => {
+                    self.do_incbin(&filename);
                 }
                 ParseExpression::OriginStatement(ref number) => {
                     let physical_address = (self.map_function)(number.number);
@@ -122,5 +127,22 @@ impl<'a> OutputWriter {
                     .unwrap(),
             };
         }
+    }
+
+    fn do_incbin(&mut self, filename: &str) {
+        let input_path = Path::new(filename);
+        let path_display = input_path.display();
+
+        let file = match File::open(input_path) {
+            Err(why) => panic!("Couldn't open {}: {}", path_display, why.description()),
+            Ok(file) => file,
+        };
+
+        let mut buf_reader = BufReader::new(file);
+        let mut file_content: Vec<u8> = Vec::new();
+
+        buf_reader.read_to_end(&mut file_content).unwrap();
+
+        self.output.write(&file_content).unwrap();
     }
 }

@@ -1,0 +1,13 @@
+snesmap lorom
+
+origin $008000
+main:
+    lda romdata,x
+    jsr print_value
+
+romdata:
+    incbin "test.dat"
+
+print_value:
+    sta $2000
+    rts

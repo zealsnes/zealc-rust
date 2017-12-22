@@ -1,3 +1,5 @@
+use std::fs;
+use std::path::{Path, PathBuf};
 use zeal::lexer::*;
 use zeal::system_definition::*;
 
@@ -38,6 +40,7 @@ pub enum ParseExpression {
     Label(String),
     OriginStatement(NumberLiteral),
     SnesMapStatement(SnesMap),
+    IncBinStatement(String, u64),
 }
 
 #[derive(Clone)]
@@ -93,14 +96,16 @@ impl<'a> Parser<'a> {
                 ParseResult::Some(node) => parsed_tree.push(node),
                 ParseResult::None => continue,
                 ParseResult::Error => continue,
-                ParseResult::Done => break,
+                ParseResult::Done => {
+                    break
+                }
             }
         }
 
         return parsed_tree;
     }
 
-    // root : (cpuInstruction | label | origin_statement | snesmap_statement)*;
+    // root : (cpuInstruction | label | origin_statement | snesmap_statement | incbin_statement)*;
     fn parse(&mut self) -> ParseResult<ParseNode<'a>> {
         let token = self.get_next_token();
         match token.ttype {
@@ -108,6 +113,9 @@ impl<'a> Parser<'a> {
             TokenType::Opcode(ref opcode_name) => self.parse_cpu_instruction(&token, opcode_name),
             TokenType::Identifier(ref label_name) => {
                 self.parse_label(&token, label_name)
+            }
+            TokenType::KeywordIncbin => {
+                self.parse_incbin(&token)
             }
             TokenType::KeywordOrigin => {
                 self.parse_origin_statement(&token)
@@ -608,6 +616,47 @@ impl<'a> Parser<'a> {
             TokenType::EndOfFile => ParseResult::Done,
             _ => {
                 self.add_error_message(&"Expected lorom or hirom as argument to snesmap.", origin_token.clone());
+                ParseResult::Error
+            }
+        }
+    }
+
+    // incbin_statement : 'incbin' STRING_LITERAL
+    fn parse_incbin(&mut self, origin_token: &Token<'a>) -> ParseResult<ParseNode<'a>> {
+        let lookahead = self.lookahead(1);
+
+        match lookahead.ttype {
+            TokenType::StringLiteral(filename) => {
+                let source_filename = self.lexer().unwrap().source_file.to_string();
+                let source_file_path = Path::new(&source_filename);
+                let mut incbin_path = PathBuf::new();
+                incbin_path.push(source_file_path.parent().unwrap());
+                incbin_path.push(&filename);
+
+                match fs::metadata(&incbin_path) {
+                    Ok(file_metadata) => {
+                        self.get_next_token(); // eat string literal
+                        let file_size = file_metadata.len();
+                        return ParseResult::Some(ParseNode {
+                            start_token: origin_token.clone(),
+                            expression: ParseExpression::IncBinStatement(incbin_path.to_str().unwrap().to_string(), file_size),
+                        });
+                    }
+                    _ => {
+                        self.get_next_token(); // eat string literal
+                        self.add_error_message(&format!("Couldn't open file '{}' for incbin statement", filename), origin_token.clone());
+                        ParseResult::Error
+                    }
+                }
+            }
+            TokenType::Invalid(invalid_token) => {
+                self.get_next_token(); // Eat token
+                self.add_invalid_token_message(invalid_token, lookahead);
+                ParseResult::Error
+            }
+            TokenType::EndOfFile => ParseResult::Done,
+            _ => {
+                self.add_error_message(&"Expected a string literal as argument to incbin", origin_token.clone());
                 ParseResult::Error
             }
         }

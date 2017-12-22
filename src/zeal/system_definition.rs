@@ -64,3 +64,15 @@ pub fn argument_size_to_byte_size(size: ArgumentSize) -> u32 {
         ArgumentSize::Word32 => 4,
     }
 }
+
+pub fn number_to_argument_size(number: u32) -> ArgumentSize {
+    if number > 16777215 {
+        ArgumentSize::Word32
+    } else if number > u16::max_value() as u32 {
+        ArgumentSize::Word24
+    } else if number > u8::max_value() as u32 {
+        ArgumentSize::Word16
+    } else {
+        ArgumentSize::Word8
+    }
+}

@@ -198,7 +198,7 @@ impl<'a> TreePass<'a> for ResolveLabelPass<'a> {
                     match argument1 {
                         &ParseArgument::Identifier(ref identifier) => {
                             if symbol_table.has_label(identifier) {
-                                let argument_size = match self.find_instruction_argument_size(opcode_name, &[AddressingMode::Immediate]) {
+                                let argument_size = match self.find_instruction_argument_size(opcode_name, &[AddressingMode::Indexed]) {
                                     Some(size) => size,
                                     None =>  self.system.label_size
                                 };
@@ -236,7 +236,7 @@ impl<'a> TreePass<'a> for ResolveLabelPass<'a> {
                         &ParseArgument::Identifier(ref identifier) => {
                             if symbol_table.has_label(identifier) {
 
-                                let argument_size = match self.find_instruction_argument_size(opcode_name, &[AddressingMode::Immediate]) {
+                                let argument_size = match self.find_instruction_argument_size(opcode_name, &[AddressingMode::Indirect]) {
                                     Some(size) => size,
                                     None =>  self.system.label_size
                                 };
@@ -273,7 +273,7 @@ impl<'a> TreePass<'a> for ResolveLabelPass<'a> {
                         &ParseArgument::Identifier(ref identifier) => {
                             if symbol_table.has_label(identifier) {
 
-                                let argument_size = match self.find_instruction_argument_size(opcode_name, &[AddressingMode::Immediate]) {
+                                let argument_size = match self.find_instruction_argument_size(opcode_name, &[AddressingMode::IndirectLong]) {
                                     Some(size) => size,
                                     None =>  self.system.label_size
                                 };
@@ -309,7 +309,7 @@ impl<'a> TreePass<'a> for ResolveLabelPass<'a> {
                     match argument1 {
                         &ParseArgument::Identifier(ref identifier) => {
                             if symbol_table.has_label(identifier) {
-                                let argument_size = match self.find_instruction_argument_size(opcode_name, &[AddressingMode::Immediate]) {
+                                let argument_size = match self.find_instruction_argument_size(opcode_name, &[AddressingMode::IndexedIndirect]) {
                                     Some(size) => size,
                                     None =>  self.system.label_size
                                 };
@@ -345,7 +345,7 @@ impl<'a> TreePass<'a> for ResolveLabelPass<'a> {
                     match argument1 {
                         &ParseArgument::Identifier(ref identifier) => {
                             if symbol_table.has_label(identifier) {
-                                let argument_size = match self.find_instruction_argument_size(opcode_name, &[AddressingMode::Immediate]) {
+                                let argument_size = match self.find_instruction_argument_size(opcode_name, &[AddressingMode::IndirectIndexed]) {
                                     Some(size) => size,
                                     None =>  self.system.label_size
                                 };
@@ -381,7 +381,7 @@ impl<'a> TreePass<'a> for ResolveLabelPass<'a> {
                     match argument1 {
                         &ParseArgument::Identifier(ref identifier) => {
                             if symbol_table.has_label(identifier) {
-                                let argument_size = match self.find_instruction_argument_size(opcode_name, &[AddressingMode::Immediate]) {
+                                let argument_size = match self.find_instruction_argument_size(opcode_name, &[AddressingMode::IndirectIndexedLong]) {
                                     Some(size) => size,
                                     None =>  self.system.label_size
                                 };
@@ -435,7 +435,7 @@ impl<'a> TreePass<'a> for ResolveLabelPass<'a> {
                     match argument1 {
                         &ParseArgument::Identifier(ref identifier) => {
                             if symbol_table.has_label(identifier) {
-                                let argument_size = match self.find_instruction_argument_size(opcode_name, &[AddressingMode::Immediate]) {
+                                let argument_size = match self.find_instruction_argument_size(opcode_name, &[AddressingMode::StackRelativeIndirectIndexed]) {
                                     Some(size) => size,
                                     None =>  self.system.label_size
                                 };
@@ -467,6 +467,10 @@ impl<'a> TreePass<'a> for ResolveLabelPass<'a> {
                 }
                 ParseExpression::OriginStatement(ref number) => {
                     current_address = number.number;
+                    new_tree.push(node.clone());
+                }
+                ParseExpression::IncBinStatement(_, file_size) => {
+                    current_address += file_size as u32;
                     new_tree.push(node.clone());
                 }
                 _ => {

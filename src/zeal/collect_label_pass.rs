@@ -462,6 +462,10 @@ impl<'a> TreePass<'a> for CollectLabelPass<'a> {
                     current_address = number.number;
                     new_tree.push(node.clone());
                 }
+                ParseExpression::IncBinStatement(_, file_size) => {
+                    current_address += file_size as u32;
+                    new_tree.push(node.clone());
+                }
                 ParseExpression::Label(ref label_name) => {
                     symbol_table.add_or_update_label(label_name, current_address);
                 }
