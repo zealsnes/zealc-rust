@@ -60,6 +60,10 @@ impl<'a> TreePass<'a> for CollectLabelPass<'a> {
         return !self.error_messages.is_empty();
     }
 
+    fn get_error_messages(&self) -> &Vec<ErrorMessage<'a>> {
+        &self.error_messages
+    }
+
     fn do_pass(
         &mut self,
         parse_tree: &Vec<ParseNode<'a>>,
