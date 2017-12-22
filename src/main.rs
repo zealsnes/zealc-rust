@@ -185,31 +185,26 @@ fn main() {
     );
 
     let mut parser = Parser::new(lexer);
-    let parse_tree = parser.parse_tree();
+    let mut parse_tree = parser.parse_tree();
     if parser.has_errors() {
         process_errors(&parser.error_messages);
     }
 
     let mut symbol_table = SymbolTable::new();
 
-    let mut collect_label_pass = CollectLabelPass::new(selected_cpu,);
-    let collect_label_tree = collect_label_pass.do_pass(&parse_tree,  &mut symbol_table);
-    if collect_label_pass.has_errors() {
-        process_errors(&collect_label_pass.get_error_messages());
-    }
+    let mut passes: Vec<Box<TreePass>> = Vec::new();
 
-    let mut resolve_label_pass = ResolveLabelPass::new(selected_cpu);
-    let resolve_label_tree = resolve_label_pass.do_pass(&collect_label_tree,  &mut symbol_table);
-    if resolve_label_pass.has_errors() {
-        process_errors(&resolve_label_pass.get_error_messages());
-    }
+    passes.push(Box::new(CollectLabelPass::new(selected_cpu)));
+    passes.push(Box::new(ResolveLabelPass::new(selected_cpu)));
+    passes.push(Box::new(InstructionToStatementPass::new(selected_cpu)));
 
-    let mut instruction_statement_pass = InstructionToStatementPass::new(selected_cpu);
-    let instruction_tree = instruction_statement_pass.do_pass(&resolve_label_tree,  &mut symbol_table);
-    if instruction_statement_pass.has_errors() {
-        process_errors(&instruction_statement_pass.get_error_messages());
+    for pass in passes.iter_mut() {
+        parse_tree = pass.do_pass(parse_tree, &mut symbol_table);
+        if pass.has_errors() {
+            process_errors(pass.get_error_messages());
+        }
     }
 
     let mut output_writer = OutputWriter::new(selected_cpu, output_path);
-    output_writer.write(&instruction_tree);
+    output_writer.write(&parse_tree);
 }

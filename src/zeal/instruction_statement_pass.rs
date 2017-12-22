@@ -131,7 +131,7 @@ impl<'a> TreePass<'a> for InstructionToStatementPass<'a> {
         &self.error_messages
     }
 
-    fn do_pass(&mut self, parse_tree: &Vec<ParseNode<'a>>, _symbol_table: &mut SymbolTable) -> Vec<ParseNode<'a>> {
+    fn do_pass(&mut self, parse_tree: Vec<ParseNode<'a>>, _symbol_table: &mut SymbolTable) -> Vec<ParseNode<'a>> {
         let mut new_tree:Vec<ParseNode<'a>> = Vec::new();
 
         for node in parse_tree.iter() {

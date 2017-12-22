@@ -66,7 +66,7 @@ impl<'a> TreePass<'a> for CollectLabelPass<'a> {
 
     fn do_pass(
         &mut self,
-        parse_tree: &Vec<ParseNode<'a>>,
+        parse_tree: Vec<ParseNode<'a>>,
         symbol_table: &mut SymbolTable,
     ) -> Vec<ParseNode<'a>> {
         let mut new_tree: Vec<ParseNode<'a>> = Vec::new();

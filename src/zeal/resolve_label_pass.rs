@@ -75,7 +75,7 @@ impl<'a> TreePass<'a> for ResolveLabelPass<'a> {
         &self.error_messages
     }
 
-    fn do_pass(&mut self, parse_tree: &Vec<ParseNode<'a>>, symbol_table: &mut SymbolTable) -> Vec<ParseNode<'a>> {
+    fn do_pass(&mut self, parse_tree: Vec<ParseNode<'a>>, symbol_table: &mut SymbolTable) -> Vec<ParseNode<'a>> {
         let mut new_tree:Vec<ParseNode<'a>> = Vec::new();
 
         let mut current_address:u32 = 0;
