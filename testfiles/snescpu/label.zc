@@ -1,4 +1,6 @@
-origin $9F0210
+snesmap lorom
+
+origin $C00210
 
     jsr function
     jsr function2
@@ -12,7 +14,8 @@ loop:
     cpx #$08
     bne loop
 
-origin $9FAAFF
+origin $C0AAFF
+
 function:
     sta $2040
     stx $2041

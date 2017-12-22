@@ -16,6 +16,12 @@ pub enum FinalInstruction {
 }
 
 #[derive(Clone)]
+pub enum SnesMap {
+    LoRom,
+    HiRom,
+}
+
+#[derive(Clone)]
 pub enum ParseExpression {
     ImpliedInstruction(String),
     ImmediateInstruction(String, ParseArgument),
@@ -31,6 +37,7 @@ pub enum ParseExpression {
     FinalInstruction(FinalInstruction),
     Label(String),
     OriginStatement(NumberLiteral),
+    SnesMapStatement(SnesMap),
 }
 
 #[derive(Clone)]
@@ -93,7 +100,7 @@ impl<'a> Parser<'a> {
         return parsed_tree;
     }
 
-    // root : (cpuInstruction | label | origin_statement)*;
+    // root : (cpuInstruction | label | origin_statement | snesmap_statement)*;
     fn parse(&mut self) -> ParseResult<ParseNode<'a>> {
         let token = self.get_next_token();
         match token.ttype {
@@ -104,6 +111,9 @@ impl<'a> Parser<'a> {
             }
             TokenType::KeywordOrigin => {
                 self.parse_origin_statement(&token)
+            }
+            TokenType::KeywordSnesMap => {
+                self.parse_snesmap_statement(&token)
             }
             TokenType::Invalid(invalid_token) => {
                 self.add_invalid_token_message(invalid_token, token);
@@ -567,6 +577,49 @@ impl<'a> Parser<'a> {
                 self.add_error_message(&"Expected a number literal after origin keyword.", origin_token.clone());
                 ParseResult::Error
             }
+        }
+    }
+
+    // snesmap_statement: 'snesmap' ('lorom'|'hirom')
+    fn parse_snesmap_statement(&mut self, origin_token: &Token<'a>) -> ParseResult<ParseNode<'a>> {
+        let lookahead = self.lookahead(1);
+
+        match lookahead.ttype {
+            TokenType::Identifier(identifier) => {
+                self.get_next_token(); // Eat literal
+                match self.identifier_to_snesmap(&identifier) {
+                    Some(snes_map) => {
+                        return ParseResult::Some(ParseNode {
+                            start_token: origin_token.clone(),
+                            expression: ParseExpression::SnesMapStatement(snes_map),
+                        });
+                    }
+                    None => {
+                        self.add_error_message(&"Expected lorom or hirom as argument to snesmap.", origin_token.clone());
+                        ParseResult::Error
+                    }
+                }
+            }
+            TokenType::Invalid(invalid_token) => {
+                self.get_next_token(); // Eat token
+                self.add_invalid_token_message(invalid_token, lookahead);
+                ParseResult::Error
+            }
+            TokenType::EndOfFile => ParseResult::Done,
+            _ => {
+                self.add_error_message(&"Expected lorom or hirom as argument to snesmap.", origin_token.clone());
+                ParseResult::Error
+            }
+        }
+    }
+
+    fn identifier_to_snesmap(&self, identifier: &str) -> Option<SnesMap> {
+        if identifier == "lorom" {
+            Some(SnesMap::LoRom)
+        } else if identifier == "hirom" {
+            Some(SnesMap::HiRom)
+        } else {
+            None
         }
     }
 

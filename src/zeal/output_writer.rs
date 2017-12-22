@@ -1,6 +1,7 @@
 extern crate byteorder;
 
 use self::byteorder::{BigEndian, LittleEndian, WriteBytesExt};
+use std::io::{Seek, SeekFrom};
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::path::Path;
@@ -11,6 +12,19 @@ use zeal::system_definition::*;
 pub struct OutputWriter {
     system: &'static SystemDefinition,
     output: File,
+    map_function: fn(u32) -> u32,
+}
+
+fn map_default(value: u32) -> u32 {
+    value
+}
+
+fn map_snes_lorom(value: u32) -> u32 {
+    ((value & 0x7F0000) >> 1) | (value & 0x7FFF)
+}
+
+fn map_snes_hirom(value: u32) -> u32 {
+    value & 0x3FFFFF
 }
 
 impl<'a> OutputWriter {
@@ -26,6 +40,7 @@ impl<'a> OutputWriter {
         OutputWriter {
             system: system,
             output: file,
+            map_function: map_default
         }
     }
 
@@ -34,6 +49,18 @@ impl<'a> OutputWriter {
             match node.expression {
                 ParseExpression::FinalInstruction(ref final_instruction) => {
                     self.handle_final_instruction(final_instruction);
+                }
+                ParseExpression::OriginStatement(ref number) => {
+                    let physical_address = (self.map_function)(number.number);
+                    match self.output.seek(SeekFrom::Start(physical_address as u64)) {
+                        _=> {}
+                    }
+                }
+                ParseExpression::SnesMapStatement(ref map_mode) => {
+                    match map_mode {
+                        &SnesMap::LoRom => self.map_function = map_snes_lorom,
+                        &SnesMap::HiRom => self.map_function = map_snes_hirom,
+                    };
                 }
                 _ => {}
             };

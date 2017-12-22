@@ -463,6 +463,7 @@ impl<'a> TreePass<'a> for ResolveLabelPass<'a> {
                 }
                 ParseExpression::OriginStatement(ref number) => {
                     current_address = number.number;
+                    new_tree.push(node.clone());
                 }
                 _ => {
                     new_tree.push(node.clone());

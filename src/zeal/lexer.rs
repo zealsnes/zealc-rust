@@ -15,7 +15,6 @@ pub enum TokenType {
     Opcode(String),
     NumberLiteral(NumberLiteral),
     Register(String),
-    KeywordOrigin,
     Comma,
     Immediate,
     LeftParen,
@@ -24,6 +23,8 @@ pub enum TokenType {
     RightBracket,
     Colon,
     EndOfFile,
+    KeywordOrigin,
+    KeywordSnesMap,
 }
 
 #[derive(Clone)]
@@ -95,7 +96,7 @@ impl<'a> Lexer<'a> {
         let backup_it = self.it.clone();
         let backup_start_line = self.start_line.clone();
 
-        for _i in 0..(times-1) {
+        for _i in 0..(times - 1) {
             self.get_next_token();
         }
 
@@ -257,6 +258,7 @@ impl<'a> Lexer<'a> {
     fn is_keyword(&mut self, identifier: &str) -> Option<TokenType> {
         match identifier {
             "origin" => Some(TokenType::KeywordOrigin),
+            "snesmap" => Some(TokenType::KeywordSnesMap),
             _ => None,
         }
     }
