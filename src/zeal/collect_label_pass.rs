@@ -104,7 +104,7 @@ impl<'a> TreePass<'a> for CollectLabelPass<'a> {
                         &ParseArgument::Identifier(_) => {
                             match self.find_instruction_argument_size(
                                 opcode_name,
-                                &[AddressingMode::SingleArgument, AddressingMode::Relative],
+                                &[AddressingMode::Relative],
                             ) {
                                 Some(size) => current_address += argument_size_to_byte_size(size),
                                 None => {
@@ -117,7 +117,7 @@ impl<'a> TreePass<'a> for CollectLabelPass<'a> {
                     }
                 }
                 ParseExpression::IndexedInstruction(
-                    ref opcode_name,
+                    _,
                     ref argument1,
                     ref argument2,
                 ) => {
@@ -129,16 +129,7 @@ impl<'a> TreePass<'a> for CollectLabelPass<'a> {
                             current_address += argument_size_to_byte_size(number.argument_size);
                         }
                         &ParseArgument::Identifier(_) => {
-                            match self.find_instruction_argument_size(
-                                opcode_name,
-                                &[AddressingMode::Indexed],
-                            ) {
-                                Some(size) => current_address += argument_size_to_byte_size(size),
-                                None => {
-                                    current_address +=
-                                        argument_size_to_byte_size(self.system.label_size);
-                                }
-                            };
+                            current_address += argument_size_to_byte_size(self.system.label_size);
                         }
                         _ => {}
                     };
@@ -148,21 +139,12 @@ impl<'a> TreePass<'a> for CollectLabelPass<'a> {
                             current_address += argument_size_to_byte_size(number.argument_size);
                         }
                         &ParseArgument::Identifier(_) => {
-                            match self.find_instruction_argument_size(
-                                opcode_name,
-                                &[AddressingMode::Indexed],
-                            ) {
-                                Some(size) => current_address += argument_size_to_byte_size(size),
-                                None => {
-                                    current_address +=
-                                        argument_size_to_byte_size(self.system.label_size);
-                                }
-                            };
+                            current_address += argument_size_to_byte_size(self.system.label_size);
                         }
                         _ => {}
                     };
                 }
-                ParseExpression::IndirectInstruction(ref opcode_name, ref argument) => {
+                ParseExpression::IndirectInstruction(_, ref argument) => {
                     new_tree.push(node.clone());
                     current_address += 1;
 
@@ -171,21 +153,12 @@ impl<'a> TreePass<'a> for CollectLabelPass<'a> {
                             current_address += argument_size_to_byte_size(number.argument_size);
                         }
                         &ParseArgument::Identifier(_) => {
-                            match self.find_instruction_argument_size(
-                                opcode_name,
-                                &[AddressingMode::Indirect],
-                            ) {
-                                Some(size) => current_address += argument_size_to_byte_size(size),
-                                None => {
-                                    current_address +=
-                                        argument_size_to_byte_size(self.system.label_size);
-                                }
-                            };
+                            current_address += argument_size_to_byte_size(self.system.label_size);
                         }
                         _ => {}
                     }
                 }
-                ParseExpression::IndirectLongInstruction(ref opcode_name, ref argument) => {
+                ParseExpression::IndirectLongInstruction(_, ref argument) => {
                     new_tree.push(node.clone());
                     current_address += 1;
 
@@ -194,22 +167,13 @@ impl<'a> TreePass<'a> for CollectLabelPass<'a> {
                             current_address += argument_size_to_byte_size(number.argument_size);
                         }
                         &ParseArgument::Identifier(_) => {
-                            match self.find_instruction_argument_size(
-                                opcode_name,
-                                &[AddressingMode::Indirect],
-                            ) {
-                                Some(size) => current_address += argument_size_to_byte_size(size),
-                                None => {
-                                    current_address +=
-                                        argument_size_to_byte_size(self.system.label_size);
-                                }
-                            };
+                            current_address += argument_size_to_byte_size(self.system.label_size);
                         }
                         _ => {}
                     }
                 }
                 ParseExpression::IndexedIndirectInstruction(
-                    ref opcode_name,
+                    _,
                     ref argument1,
                     ref argument2,
                 ) => {
@@ -221,16 +185,7 @@ impl<'a> TreePass<'a> for CollectLabelPass<'a> {
                             current_address += argument_size_to_byte_size(number.argument_size);
                         }
                         &ParseArgument::Identifier(_) => {
-                            match self.find_instruction_argument_size(
-                                opcode_name,
-                                &[AddressingMode::IndexedIndirect],
-                            ) {
-                                Some(size) => current_address += argument_size_to_byte_size(size),
-                                None => {
-                                    current_address +=
-                                        argument_size_to_byte_size(self.system.label_size);
-                                }
-                            };
+                            current_address += argument_size_to_byte_size(self.system.label_size);
                         }
                         _ => {}
                     };
@@ -240,22 +195,13 @@ impl<'a> TreePass<'a> for CollectLabelPass<'a> {
                             current_address += argument_size_to_byte_size(number.argument_size);
                         }
                         &ParseArgument::Identifier(_) => {
-                            match self.find_instruction_argument_size(
-                                opcode_name,
-                                &[AddressingMode::IndexedIndirect],
-                            ) {
-                                Some(size) => current_address += argument_size_to_byte_size(size),
-                                None => {
-                                    current_address +=
-                                        argument_size_to_byte_size(self.system.label_size);
-                                }
-                            };
+                            current_address += argument_size_to_byte_size(self.system.label_size);
                         }
                         _ => {}
                     };
                 }
                 ParseExpression::IndirectIndexedInstruction(
-                    ref opcode_name,
+                    _,
                     ref argument1,
                     ref argument2,
                 ) => {
@@ -267,16 +213,7 @@ impl<'a> TreePass<'a> for CollectLabelPass<'a> {
                             current_address += argument_size_to_byte_size(number.argument_size);
                         }
                         &ParseArgument::Identifier(_) => {
-                            match self.find_instruction_argument_size(
-                                opcode_name,
-                                &[AddressingMode::IndirectIndexed],
-                            ) {
-                                Some(size) => current_address += argument_size_to_byte_size(size),
-                                None => {
-                                    current_address +=
-                                        argument_size_to_byte_size(self.system.label_size);
-                                }
-                            };
+                            current_address += argument_size_to_byte_size(self.system.label_size);
                         }
                         _ => {}
                     };
@@ -286,22 +223,13 @@ impl<'a> TreePass<'a> for CollectLabelPass<'a> {
                             current_address += argument_size_to_byte_size(number.argument_size);
                         }
                         &ParseArgument::Identifier(_) => {
-                            match self.find_instruction_argument_size(
-                                opcode_name,
-                                &[AddressingMode::IndirectIndexed],
-                            ) {
-                                Some(size) => current_address += argument_size_to_byte_size(size),
-                                None => {
-                                    current_address +=
-                                        argument_size_to_byte_size(self.system.label_size);
-                                }
-                            };
+                            current_address += argument_size_to_byte_size(self.system.label_size);
                         }
                         _ => {}
                     };
                 }
                 ParseExpression::IndirectIndexedLongInstruction(
-                    ref opcode_name,
+                    _,
                     ref argument1,
                     ref argument2,
                 ) => {
@@ -313,16 +241,7 @@ impl<'a> TreePass<'a> for CollectLabelPass<'a> {
                             current_address += argument_size_to_byte_size(number.argument_size);
                         }
                         &ParseArgument::Identifier(_) => {
-                            match self.find_instruction_argument_size(
-                                opcode_name,
-                                &[AddressingMode::IndirectIndexedLong],
-                            ) {
-                                Some(size) => current_address += argument_size_to_byte_size(size),
-                                None => {
-                                    current_address +=
-                                        argument_size_to_byte_size(self.system.label_size);
-                                }
-                            };
+                            current_address += argument_size_to_byte_size(self.system.label_size);
                         }
                         _ => {}
                     };
@@ -332,22 +251,13 @@ impl<'a> TreePass<'a> for CollectLabelPass<'a> {
                             current_address += argument_size_to_byte_size(number.argument_size);
                         }
                         &ParseArgument::Identifier(_) => {
-                            match self.find_instruction_argument_size(
-                                opcode_name,
-                                &[AddressingMode::IndirectIndexedLong],
-                            ) {
-                                Some(size) => current_address += argument_size_to_byte_size(size),
-                                None => {
-                                    current_address +=
-                                        argument_size_to_byte_size(self.system.label_size);
-                                }
-                            };
+                            current_address += argument_size_to_byte_size(self.system.label_size);
                         }
                         _ => {}
                     };
                 }
                 ParseExpression::BlockMoveInstruction(
-                    ref opcode_name,
+                    _,
                     ref argument1,
                     ref argument2,
                 ) => {
@@ -359,16 +269,7 @@ impl<'a> TreePass<'a> for CollectLabelPass<'a> {
                             current_address += argument_size_to_byte_size(number.argument_size);
                         }
                         &ParseArgument::Identifier(_) => {
-                            match self.find_instruction_argument_size(
-                                opcode_name,
-                                &[AddressingMode::BlockMove],
-                            ) {
-                                Some(size) => current_address += argument_size_to_byte_size(size),
-                                None => {
-                                    current_address +=
-                                        argument_size_to_byte_size(self.system.label_size);
-                                }
-                            };
+                            current_address += argument_size_to_byte_size(self.system.label_size);
                         }
                         _ => {}
                     };
@@ -378,22 +279,13 @@ impl<'a> TreePass<'a> for CollectLabelPass<'a> {
                             current_address += argument_size_to_byte_size(number.argument_size);
                         }
                         &ParseArgument::Identifier(_) => {
-                            match self.find_instruction_argument_size(
-                                opcode_name,
-                                &[AddressingMode::BlockMove],
-                            ) {
-                                Some(size) => current_address += argument_size_to_byte_size(size),
-                                None => {
-                                    current_address +=
-                                        argument_size_to_byte_size(self.system.label_size);
-                                }
-                            };
+                            current_address += argument_size_to_byte_size(self.system.label_size);
                         }
                         _ => {}
                     };
                 }
                 ParseExpression::StackRelativeIndirectIndexedInstruction(
-                    ref opcode_name,
+                    _,
                     ref argument1,
                     ref argument2,
                     ref argument3,
@@ -406,16 +298,7 @@ impl<'a> TreePass<'a> for CollectLabelPass<'a> {
                             current_address += argument_size_to_byte_size(number.argument_size);
                         }
                         &ParseArgument::Identifier(_) => {
-                            match self.find_instruction_argument_size(
-                                opcode_name,
-                                &[AddressingMode::StackRelativeIndirectIndexed],
-                            ) {
-                                Some(size) => current_address += argument_size_to_byte_size(size),
-                                None => {
-                                    current_address +=
-                                        argument_size_to_byte_size(self.system.label_size);
-                                }
-                            };
+                            current_address += argument_size_to_byte_size(self.system.label_size);
                         }
                         _ => {}
                     };
@@ -425,16 +308,7 @@ impl<'a> TreePass<'a> for CollectLabelPass<'a> {
                             current_address += argument_size_to_byte_size(number.argument_size);
                         }
                         &ParseArgument::Identifier(_) => {
-                            match self.find_instruction_argument_size(
-                                opcode_name,
-                                &[AddressingMode::BlockMove],
-                            ) {
-                                Some(size) => current_address += argument_size_to_byte_size(size),
-                                None => {
-                                    current_address +=
-                                        argument_size_to_byte_size(self.system.label_size);
-                                }
-                            };
+                            current_address += argument_size_to_byte_size(self.system.label_size);
                         }
                         _ => {}
                     };
@@ -444,16 +318,7 @@ impl<'a> TreePass<'a> for CollectLabelPass<'a> {
                             current_address += argument_size_to_byte_size(number.argument_size);
                         }
                         &ParseArgument::Identifier(_) => {
-                            match self.find_instruction_argument_size(
-                                opcode_name,
-                                &[AddressingMode::StackRelativeIndirectIndexed],
-                            ) {
-                                Some(size) => current_address += argument_size_to_byte_size(size),
-                                None => {
-                                    current_address +=
-                                        argument_size_to_byte_size(self.system.label_size);
-                                }
-                            };
+                            current_address += argument_size_to_byte_size(self.system.label_size);
                         }
                         _ => {}
                     };
