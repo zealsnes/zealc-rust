@@ -5,9 +5,9 @@ pub struct SymbolTable {
 }
 
 impl SymbolTable {
-    pub fn new() -> Self{
+    pub fn new() -> Self {
         SymbolTable {
-            label_map: HashMap::new()
+            label_map: HashMap::new(),
         }
     }
 

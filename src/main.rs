@@ -4,16 +4,16 @@ mod zeal;
 mod snes_cpu;
 
 use clap::{App, Arg};
-use std::error::Error;
+
+use std::path::Path;
+use std::io::Read;
 use std::fs::File;
-use std::path::{Path, PathBuf};
-use std::io::prelude::*;
+use std::error::Error;
 
 use snes_cpu::*;
 
 use zeal::collect_label_pass::*;
 use zeal::instruction_statement_pass::*;
-use zeal::lexer::*;
 use zeal::output_writer::*;
 use zeal::parser::*;
 use zeal::pass::*;
@@ -22,20 +22,6 @@ use zeal::symbol_table::*;
 use zeal::system_definition::SystemDefinition;
 
 static SUPPORTED_SYSTEMS: &'static [&'static SystemDefinition] = &[&SNES_CPU];
-
-fn absolute_path(path: &Path) -> std::io::Result<PathBuf> {
-    let path_buf = path.canonicalize()?;
-
-    #[cfg(windows)]
-    let path_buf = Path::new(
-        path_buf
-            .as_path()
-            .to_string_lossy()
-            .trim_left_matches(r"\\?\"),
-    ).to_path_buf();
-
-    Ok(path_buf)
-}
 
 fn find_system(cpu_name: &str) -> &'static SystemDefinition {
     for system in SUPPORTED_SYSTEMS.iter() {
@@ -62,7 +48,29 @@ fn print_error_message(error_message: &ErrorMessage) {
         error_message.message
     );
 
-    for context_char in error_message.token.context_start.clone() {
+    let mut file = match File::open(&error_message.token.source_file) {
+        Err(why) => panic!(
+            "Couldn't open {}: {}",
+            error_message.token.source_file,
+            why.description()
+        ),
+        Ok(file) => file,
+    };
+
+    let mut string_file_content = String::new();
+    match file.read_to_string(&mut string_file_content) {
+        Err(why) => panic!(
+            "Couldn't read {}: {}",
+            error_message.token.source_file,
+            why.description()
+        ),
+        Ok(result) => result,
+    };
+
+    for context_char in string_file_content
+        .chars()
+        .skip(error_message.token.context_start)
+    {
         if context_char == '\n' {
             break;
         } else {
@@ -154,37 +162,14 @@ fn main() {
         Some(result) => Path::new(result),
     };
 
-    let input_path = Path::new(input_file);
-    let path_display = input_path.display();
-
-    let mut file = match File::open(input_path) {
-        Err(why) => panic!("Couldn't open {}: {}", path_display, why.description()),
-        Ok(file) => file,
-    };
-
-    let mut file_contents = String::new();
-    match file.read_to_string(&mut file_contents) {
-        Err(why) => panic!("Couldn't read {}: {}", path_display, why.description()),
-        Ok(result) => result,
-    };
-
-    let file_string_path = match absolute_path(input_path) {
-        Err(_) => std::path::PathBuf::new(),
-        Ok(result) => result,
-    };
-
     let selected_cpu = match cmd_matches.value_of("cpu") {
         None => &SNES_CPU,
         Some(cpu_name) => find_system(cpu_name),
     };
 
-    let lexer = Lexer::new(
-        selected_cpu,
-        &file_contents,
-        file_string_path.to_str().unwrap().to_string(),
-    );
+    let mut parser = Parser::new(selected_cpu);
+    parser.set_current_input_file(input_file);
 
-    let mut parser = Parser::new(lexer);
     let mut parse_tree = parser.parse_tree();
     if parser.has_errors() {
         process_errors(&parser.error_messages);

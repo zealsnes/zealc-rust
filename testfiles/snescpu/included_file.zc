@@ -1,0 +1,7 @@
+origin $C01000
+
+function:
+    sta $2040
+    stx $2041
+    sty $2042
+    rts

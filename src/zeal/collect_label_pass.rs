@@ -3,12 +3,12 @@ use zeal::system_definition::*;
 use zeal::pass::TreePass;
 use zeal::symbol_table::*;
 
-pub struct CollectLabelPass<'a> {
+pub struct CollectLabelPass {
     system: &'static SystemDefinition,
-    pub error_messages: Vec<ErrorMessage<'a>>,
+    pub error_messages: Vec<ErrorMessage>,
 }
 
-impl<'a> CollectLabelPass<'a> {
+impl CollectLabelPass {
     pub fn new(system: &'static SystemDefinition) -> Self {
         CollectLabelPass {
             system: system,
@@ -55,21 +55,21 @@ impl<'a> CollectLabelPass<'a> {
     }
 }
 
-impl<'a> TreePass<'a> for CollectLabelPass<'a> {
+impl TreePass for CollectLabelPass {
     fn has_errors(&self) -> bool {
         return !self.error_messages.is_empty();
     }
 
-    fn get_error_messages(&self) -> &Vec<ErrorMessage<'a>> {
+    fn get_error_messages(&self) -> &Vec<ErrorMessage> {
         &self.error_messages
     }
 
     fn do_pass(
         &mut self,
-        parse_tree: Vec<ParseNode<'a>>,
+        parse_tree: Vec<ParseNode>,
         symbol_table: &mut SymbolTable,
-    ) -> Vec<ParseNode<'a>> {
-        let mut new_tree: Vec<ParseNode<'a>> = Vec::new();
+    ) -> Vec<ParseNode> {
+        let mut new_tree: Vec<ParseNode> = Vec::new();
 
         let mut current_address: u32 = 0;
 
@@ -116,11 +116,7 @@ impl<'a> TreePass<'a> for CollectLabelPass<'a> {
                         _ => {}
                     }
                 }
-                ParseExpression::IndexedInstruction(
-                    _,
-                    ref argument1,
-                    ref argument2,
-                ) => {
+                ParseExpression::IndexedInstruction(_, ref argument1, ref argument2) => {
                     new_tree.push(node.clone());
                     current_address += 1;
 
@@ -172,11 +168,7 @@ impl<'a> TreePass<'a> for CollectLabelPass<'a> {
                         _ => {}
                     }
                 }
-                ParseExpression::IndexedIndirectInstruction(
-                    _,
-                    ref argument1,
-                    ref argument2,
-                ) => {
+                ParseExpression::IndexedIndirectInstruction(_, ref argument1, ref argument2) => {
                     new_tree.push(node.clone());
                     current_address += 1;
 
@@ -200,11 +192,7 @@ impl<'a> TreePass<'a> for CollectLabelPass<'a> {
                         _ => {}
                     };
                 }
-                ParseExpression::IndirectIndexedInstruction(
-                    _,
-                    ref argument1,
-                    ref argument2,
-                ) => {
+                ParseExpression::IndirectIndexedInstruction(_, ref argument1, ref argument2) => {
                     new_tree.push(node.clone());
                     current_address += 1;
 
@@ -256,11 +244,7 @@ impl<'a> TreePass<'a> for CollectLabelPass<'a> {
                         _ => {}
                     };
                 }
-                ParseExpression::BlockMoveInstruction(
-                    _,
-                    ref argument1,
-                    ref argument2,
-                ) => {
+                ParseExpression::BlockMoveInstruction(_, ref argument1, ref argument2) => {
                     new_tree.push(node.clone());
                     current_address += 1;
 

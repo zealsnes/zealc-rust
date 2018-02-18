@@ -1,0 +1,21 @@
+snesmap hirom
+
+origin $C00210
+
+    jsr function
+    jsr function2
+
+    lda #123
+    ldx #0
+loop:
+    sta $00,x
+
+    inx
+    cpx #$08
+    bne loop
+
+include "included_file.zc"
+
+function2:
+    lda ($1F),y
+    rts

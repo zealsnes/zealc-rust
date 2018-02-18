@@ -1,5 +1,7 @@
-use std::str::Chars;
-use std::iter::Peekable;
+use std::io::{Read, Result};
+use std::fs::{File};
+use std::error::Error;
+use std::path::{Path, PathBuf};
 use zeal::system_definition::*;
 
 #[derive(PartialEq, Copy, Clone)]
@@ -24,28 +26,30 @@ pub enum TokenType {
     RightBracket,
     Colon,
     EndOfFile,
+    KeywordInclude,
     KeywordIncbin,
     KeywordOrigin,
     KeywordSnesMap,
 }
 
 #[derive(Clone)]
-pub struct Token<'a> {
+pub struct Token {
     pub ttype: TokenType,
     pub line: u32,
     pub start_column: u32,
     pub end_column: u32,
     pub source_file: String,
-    pub context_start: Peekable<Chars<'a>>,
+    pub context_start: usize
 }
 
-pub struct Lexer<'a> {
+pub struct Lexer {
     system: &'static SystemDefinition,
-    it: Peekable<Chars<'a>>,
-    start_line: Peekable<Chars<'a>>,
     pub source_file: String,
+    file_content: Vec<char>,
+    current_char: usize,
     line: u32,
     column: u32,
+    line_start: usize
 }
 
 fn is_ascii_numeric(current_char: char) -> bool {
@@ -66,23 +70,70 @@ fn is_ascii_alphanumeric(current_char: char) -> bool {
         || (current_char >= 'a' && current_char <= 'z')
 }
 
-impl<'a> Lexer<'a> {
-    pub fn new(
-        system: &'static SystemDefinition,
-        file_content: &'a str,
-        source_file: String,
-    ) -> Self {
+fn absolute_path(path: &Path) -> Result<PathBuf> {
+    let path_buf = path.canonicalize()?;
+
+    #[cfg(windows)]
+    let path_buf = Path::new(
+        path_buf
+            .as_path()
+            .to_string_lossy()
+            .trim_left_matches(r"\\?\"),
+    ).to_path_buf();
+
+    Ok(path_buf)
+}
+
+impl Lexer {
+    // pub fn from_string(
+    //     system: &'static SystemDefinition,
+    //     file_content: &str,
+    // ) -> Self {
+    //     Lexer {
+    //         system: system,
+    //         file_content: file_content.chars().collect(),
+    //         current_char: 0,
+    //         source_file: String::from(""),
+    //         line: 1,
+    //         column: 1,
+    //         line_start: 0,
+    //     }
+    // }
+
+    pub fn from_file(system: &'static SystemDefinition, filename: &str) -> Self {
+        let input_path = Path::new(filename);
+        let path_display = input_path.display();
+
+        let mut file = match File::open(input_path) {
+            Err(why) => panic!("Couldn't open {}: {}", path_display, why.description()),
+            Ok(file) => file,
+        };
+
+        let mut string_file_content = String::new();
+        match file.read_to_string(&mut string_file_content) {
+            Err(why) => panic!("Couldn't read {}: {}", path_display, why.description()),
+            Ok(result) => result,
+        };
+
+        let absolute_path_buf = match absolute_path(input_path) {
+            Err(_) => None,
+            Ok(result) => {
+                Some(result)
+            }
+        };
+
         Lexer {
             system: system,
-            it: file_content.chars().peekable(),
-            start_line: file_content.chars().peekable(),
-            source_file: source_file,
+            file_content: string_file_content.chars().collect(),
+            current_char: 0,
+            source_file: absolute_path_buf.unwrap().to_str().unwrap().to_string(),
             line: 1,
             column: 1,
+            line_start: 0,
         }
     }
 
-    pub fn get_next_token(&mut self) -> Token<'a> {
+    pub fn get_next_token(&mut self) -> Token {
         self.eat_whitespaces();
         self.eat_comment();
 
@@ -92,11 +143,18 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    pub fn lookahead(&mut self, times: u32) -> Token<'a> {
+    pub fn reset(&mut self) {
+        self.line = 1;
+        self.column = 0;
+        self.current_char = 0;
+        self.line_start = 0;
+    }
+
+    pub fn lookahead(&mut self, times: u32) -> Token {
         let backup_line = self.line;
         let backup_column = self.column;
-        let backup_it = self.it.clone();
-        let backup_start_line = self.start_line.clone();
+        let backup_current_char = self.current_char;
+        let backup_line_start = self.line_start;
 
         for _i in 0..(times - 1) {
             self.get_next_token();
@@ -106,13 +164,13 @@ impl<'a> Lexer<'a> {
 
         self.line = backup_line;
         self.column = backup_column;
-        self.it = backup_it;
-        self.start_line = backup_start_line;
+        self.current_char = backup_current_char;
+        self.line_start = backup_line_start;
 
         return lookahead;
     }
 
-    fn parse_token(&mut self, current_char: char) -> Token<'a> {
+    fn parse_token(&mut self, current_char: char) -> Token {
         match current_char {
             'a'...'z' | 'A'...'Z' | '_' => {
                 return self.parse_identifier_or_similar();
@@ -196,8 +254,8 @@ impl<'a> Lexer<'a> {
         self.eat_whitespaces();
     }
 
-    fn parse_identifier_or_similar(&mut self) -> Token<'a> {
-        let context_start = self.start_line.clone();
+    fn parse_identifier_or_similar(&mut self) -> Token {
+        let context_start = self.line_start;
         let start_column = self.column;
         let mut parsed_identifier = String::new();
 
@@ -260,8 +318,8 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn parse_string_literal(&mut self) -> Token<'a> {
-        let context_start = self.start_line.clone();
+    fn parse_string_literal(&mut self) -> Token {
+        let context_start = self.line_start;
         let start_column = self.column;
 
         let mut parsed_string = String::new();
@@ -310,6 +368,7 @@ impl<'a> Lexer<'a> {
 
     fn is_keyword(&mut self, identifier: &str) -> Option<TokenType> {
         match identifier {
+            "include" => Some(TokenType::KeywordInclude),
             "incbin" => Some(TokenType::KeywordIncbin),
             "origin" => Some(TokenType::KeywordOrigin),
             "snesmap" => Some(TokenType::KeywordSnesMap),
@@ -317,8 +376,8 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn parse_hex_number(&mut self) -> Token<'a> {
-        let context_start = self.start_line.clone();
+    fn parse_hex_number(&mut self) -> Token {
+        let context_start = self.line_start;
         let start_column = self.column;
 
         // Eat $
@@ -369,8 +428,8 @@ impl<'a> Lexer<'a> {
         )
     }
 
-    fn parse_binary_number(&mut self) -> Token<'a> {
-        let context_start = self.start_line.clone();
+    fn parse_binary_number(&mut self) -> Token {
+        let context_start = self.line_start;
         let start_column = self.column;
 
         // Eat %
@@ -421,8 +480,8 @@ impl<'a> Lexer<'a> {
         )
     }
 
-    fn parse_number(&mut self) -> Token<'a> {
-        let context_start = self.start_line.clone();
+    fn parse_number(&mut self) -> Token {
+        let context_start = self.line_start;
         let start_column = self.column;
         let mut parsed_number = String::new();
 
@@ -486,11 +545,11 @@ impl<'a> Lexer<'a> {
         self.column = 0;
 
         self.consume();
-        self.start_line = self.it.clone();
+        self.line_start = self.current_char;
     }
 
-    fn token_invalid(&mut self) -> Token<'a> {
-        let context_start = self.start_line.clone();
+    fn token_invalid(&mut self) -> Token {
+        let context_start = self.line_start;
 
         let invalid_char = match self.consume() {
             Some(result) => result,
@@ -508,10 +567,10 @@ impl<'a> Lexer<'a> {
         )
     }
 
-    fn token_eof(&mut self) -> Token<'a> {
+    fn token_eof(&mut self) -> Token {
         let start_column = self.column;
         let end_column = self.column;
-        let context_start = self.start_line.clone();
+        let context_start = self.line_start;
 
         self.new_token(
             TokenType::EndOfFile,
@@ -521,8 +580,8 @@ impl<'a> Lexer<'a> {
         )
     }
 
-    fn new_simple_token(&mut self, ttype: TokenType) -> Token<'a> {
-        let context_start = self.start_line.clone();
+    fn new_simple_token(&mut self, ttype: TokenType) -> Token {
+        let context_start = self.line_start;
         let start_column = self.column;
         self.consume();
         let end_column = self.column;
@@ -534,8 +593,8 @@ impl<'a> Lexer<'a> {
         ttype: TokenType,
         start_column: u32,
         end_column: u32,
-        context_start: Peekable<Chars<'a>>,
-    ) -> Token<'a> {
+        context_start: usize,
+    ) -> Token {
         Token {
             ttype: ttype,
             line: self.line,
@@ -547,28 +606,33 @@ impl<'a> Lexer<'a> {
     }
 
     fn peek(&mut self) -> Option<&char> {
-        match self.it.peek() {
-            None => None,
-            Some(result) => Some(result),
+        if self.current_char < self.file_content.len() {
+            return Some(&self.file_content[self.current_char]);
+        }
+        else {
+            return None;
         }
     }
 
     fn peek_lookahead(&mut self, lookahead: usize) -> Option<char> {
-        let mut skip_it = self.it.clone().skip(lookahead);
+        let lookahead = self.current_char + lookahead;
 
-        match skip_it.next() {
-            Some(result) => Some(result),
-            None => None,
+        if lookahead < self.file_content.len() {
+            return Some(self.file_content[lookahead]);
+        } else {
+            return None;
         }
     }
 
     fn consume(&mut self) -> Option<char> {
-        match self.it.next() {
-            None => None,
-            Some(result) => {
-                self.column += 1;
-                return Some(result);
-            }
+        if self.current_char< self.file_content.len() {
+            let consumed_char = self.file_content[self.current_char];
+            self.current_char += 1;
+            self.column += 1;
+            return Some(consumed_char);
+        } 
+        else {
+            return None;
         }
     }
 }

@@ -46,7 +46,7 @@ impl<'a> OutputWriter {
         }
     }
 
-    pub fn write(&mut self, parse_tree: &Vec<ParseNode<'a>>) {
+    pub fn write(&mut self, parse_tree: &Vec<ParseNode>) {
         for node in parse_tree.iter() {
             match node.expression {
                 ParseExpression::FinalInstruction(ref final_instruction) => {

@@ -4,30 +4,34 @@ use zeal::system_definition::*;
 use zeal::pass::TreePass;
 use zeal::symbol_table::*;
 
-pub struct ResolveLabelPass<'a> {
+pub struct ResolveLabelPass {
     system: &'static SystemDefinition,
-    pub error_messages: Vec<ErrorMessage<'a>>,
+    pub error_messages: Vec<ErrorMessage>,
 }
 
-impl<'a> ResolveLabelPass<'a> {
+impl ResolveLabelPass {
     pub fn new(system: &'static SystemDefinition) -> Self {
         ResolveLabelPass {
             system: system,
-            error_messages: Vec::new()
+            error_messages: Vec::new(),
         }
     }
 
-    fn add_error_message(&mut self, error_message: &str, offending_token: Token<'a>) {
+    fn add_error_message(&mut self, error_message: &str, offending_token: Token) {
         let new_message = ErrorMessage {
             message: error_message.to_owned(),
             token: offending_token,
-            severity: ErrorSeverity::Error
+            severity: ErrorSeverity::Error,
         };
 
         self.error_messages.push(new_message);
     }
 
-    fn find_instruction_argument_size(&self, opcode_name: &str, possible_addressings: &[AddressingMode]) -> Option<ArgumentSize> {
+    fn find_instruction_argument_size(
+        &self,
+        opcode_name: &str,
+        possible_addressings: &[AddressingMode],
+    ) -> Option<ArgumentSize> {
         for instruction in self.system.instructions.iter() {
             if instruction.name == opcode_name {
                 for addressing_mode in possible_addressings.iter() {
@@ -50,7 +54,7 @@ impl<'a> ResolveLabelPass<'a> {
             }
         }
 
-        return None
+        return None;
     }
 
     fn is_branching_instruction(&self, opcode_name: &str) -> bool {
@@ -66,19 +70,23 @@ impl<'a> ResolveLabelPass<'a> {
     }
 }
 
-impl<'a> TreePass<'a> for ResolveLabelPass<'a> {
+impl TreePass for ResolveLabelPass {
     fn has_errors(&self) -> bool {
-        return !self.error_messages.is_empty()
+        return !self.error_messages.is_empty();
     }
 
-    fn get_error_messages(&self) -> &Vec<ErrorMessage<'a>> {
+    fn get_error_messages(&self) -> &Vec<ErrorMessage> {
         &self.error_messages
     }
 
-    fn do_pass(&mut self, parse_tree: Vec<ParseNode<'a>>, symbol_table: &mut SymbolTable) -> Vec<ParseNode<'a>> {
-        let mut new_tree:Vec<ParseNode<'a>> = Vec::new();
+    fn do_pass(
+        &mut self,
+        parse_tree: Vec<ParseNode>,
+        symbol_table: &mut SymbolTable,
+    ) -> Vec<ParseNode> {
+        let mut new_tree: Vec<ParseNode> = Vec::new();
 
-        let mut current_address:u32 = 0;
+        let mut current_address: u32 = 0;
 
         for node in parse_tree.iter() {
             match node.expression {
@@ -92,22 +100,27 @@ impl<'a> TreePass<'a> for ResolveLabelPass<'a> {
                     match argument {
                         &ParseArgument::Identifier(ref identifier) => {
                             if symbol_table.has_label(identifier) {
-
                                 let argument_size = self.system.label_size;
 
                                 let number = NumberLiteral {
                                     number: symbol_table.address_for(identifier),
-                                    argument_size: argument_size
+                                    argument_size: argument_size,
                                 };
 
                                 current_address += argument_size_to_byte_size(argument_size);
 
                                 new_tree.push(ParseNode {
                                     start_token: node.start_token.clone(),
-                                    expression: ParseExpression::ImmediateInstruction(opcode_name.to_owned(), ParseArgument::NumberLiteral(number))
+                                    expression: ParseExpression::ImmediateInstruction(
+                                        opcode_name.to_owned(),
+                                        ParseArgument::NumberLiteral(number),
+                                    ),
                                 });
                             } else {
-                                self.add_error_message(&format!("Label '{}' not found.", identifier), node.start_token.clone());
+                                self.add_error_message(
+                                    &format!("Label '{}' not found.", identifier),
+                                    node.start_token.clone(),
+                                );
                                 new_tree.push(node.clone());
                             }
                         }
@@ -126,9 +139,12 @@ impl<'a> TreePass<'a> for ResolveLabelPass<'a> {
                     match argument {
                         &ParseArgument::Identifier(ref identifier) => {
                             if symbol_table.has_label(identifier) {
-                                let argument_size = match self.find_instruction_argument_size(opcode_name, &[AddressingMode::Relative]) {
+                                let argument_size = match self.find_instruction_argument_size(
+                                    opcode_name,
+                                    &[AddressingMode::Relative],
+                                ) {
                                     Some(size) => size,
-                                    None =>  self.system.label_size
+                                    None => self.system.label_size,
                                 };
 
                                 let mut address = 0;
@@ -137,24 +153,26 @@ impl<'a> TreePass<'a> for ResolveLabelPass<'a> {
                                     match argument_size {
                                         ArgumentSize::Word8 => {
                                             let temp_address:i64 = (symbol_table.address_for(identifier) as i64) - ((current_address + argument_size_to_byte_size(argument_size)) as i64);
-                                            if temp_address > (i8::max_value() as i64) || temp_address < (i8::min_value() as i64)
+                                            if temp_address > (i8::max_value() as i64)
+                                                || temp_address < (i8::min_value() as i64)
                                             {
-                                                println!("address: {}, current_address: {}", symbol_table.address_for(identifier), current_address);
+                                                println!(
+                                                    "address: {}, current_address: {}",
+                                                    symbol_table.address_for(identifier),
+                                                    current_address
+                                                );
                                                 self.add_error_message(&format!("Branch label '{0}' is too far away. Consider reducing the distance of the label.", identifier), node.start_token.clone());
-                                            }
-                                            else
-                                            {
+                                            } else {
                                                 address = (temp_address as u32) & 0xFF;
                                             }
                                         }
                                         ArgumentSize::Word16 => {
                                             let temp_address:i64 = (symbol_table.address_for(identifier) as i64) - ((current_address + argument_size_to_byte_size(argument_size)) as i64);
-                                            if temp_address > (i16::max_value() as i64) || temp_address < (i16::min_value() as i64)
+                                            if temp_address > (i16::max_value() as i64)
+                                                || temp_address < (i16::min_value() as i64)
                                             {
                                                 self.add_error_message(&format!("Branch label '{0}' is too far away. Consider reducing the distance of the label.", identifier), node.start_token.clone());
-                                            }
-                                            else
-                                            {
+                                            } else {
                                                 address = (temp_address as u32) & 0xFFFF;
                                             }
                                         }
@@ -166,17 +184,23 @@ impl<'a> TreePass<'a> for ResolveLabelPass<'a> {
 
                                 let number = NumberLiteral {
                                     number: address,
-                                    argument_size: argument_size
+                                    argument_size: argument_size,
                                 };
 
                                 current_address += argument_size_to_byte_size(argument_size);
 
                                 new_tree.push(ParseNode {
                                     start_token: node.start_token.clone(),
-                                    expression: ParseExpression::SingleArgumentInstruction(opcode_name.to_owned(), ParseArgument::NumberLiteral(number))
+                                    expression: ParseExpression::SingleArgumentInstruction(
+                                        opcode_name.to_owned(),
+                                        ParseArgument::NumberLiteral(number),
+                                    ),
                                 });
                             } else {
-                                self.add_error_message(&format!("Label '{}' not found.", identifier), node.start_token.clone());
+                                self.add_error_message(
+                                    &format!("Label '{}' not found.", identifier),
+                                    node.start_token.clone(),
+                                );
                                 new_tree.push(node.clone());
                             }
                         }
@@ -189,7 +213,11 @@ impl<'a> TreePass<'a> for ResolveLabelPass<'a> {
                         }
                     }
                 }
-                ParseExpression::IndexedInstruction(ref opcode_name, ref argument1, ref argument2) => {
+                ParseExpression::IndexedInstruction(
+                    ref opcode_name,
+                    ref argument1,
+                    ref argument2,
+                ) => {
                     current_address += 1;
 
                     match argument1 {
@@ -199,26 +227,33 @@ impl<'a> TreePass<'a> for ResolveLabelPass<'a> {
 
                                 let number = NumberLiteral {
                                     number: symbol_table.address_for(identifier),
-                                    argument_size: argument_size
+                                    argument_size: argument_size,
                                 };
 
                                 current_address += argument_size_to_byte_size(argument_size);
 
                                 new_tree.push(ParseNode {
                                     start_token: node.start_token.clone(),
-                                    expression: ParseExpression::IndexedInstruction(opcode_name.to_owned(), ParseArgument::NumberLiteral(number), argument2.clone())
+                                    expression: ParseExpression::IndexedInstruction(
+                                        opcode_name.to_owned(),
+                                        ParseArgument::NumberLiteral(number),
+                                        argument2.clone(),
+                                    ),
                                 });
                             } else {
-                                self.add_error_message(&format!("Label '{}' not found.", identifier), node.start_token.clone());
+                                self.add_error_message(
+                                    &format!("Label '{}' not found.", identifier),
+                                    node.start_token.clone(),
+                                );
                                 new_tree.push(node.clone());
                             }
                         }
                         &ParseArgument::NumberLiteral(ref number) => {
                             current_address += argument_size_to_byte_size(number.argument_size);
-                             new_tree.push(node.clone());
+                            new_tree.push(node.clone());
                         }
                         _ => {
-                             new_tree.push(node.clone());
+                            new_tree.push(node.clone());
                         }
                     };
                 }
@@ -229,22 +264,27 @@ impl<'a> TreePass<'a> for ResolveLabelPass<'a> {
                     match argument {
                         &ParseArgument::Identifier(ref identifier) => {
                             if symbol_table.has_label(identifier) {
-
                                 let argument_size = self.system.label_size;
 
                                 let number = NumberLiteral {
                                     number: symbol_table.address_for(identifier),
-                                    argument_size: argument_size
+                                    argument_size: argument_size,
                                 };
 
                                 current_address += argument_size_to_byte_size(argument_size);
 
                                 new_tree.push(ParseNode {
                                     start_token: node.start_token.clone(),
-                                    expression: ParseExpression::IndirectInstruction(opcode_name.to_owned(), ParseArgument::NumberLiteral(number))
+                                    expression: ParseExpression::IndirectInstruction(
+                                        opcode_name.to_owned(),
+                                        ParseArgument::NumberLiteral(number),
+                                    ),
                                 });
                             } else {
-                                self.add_error_message(&format!("Label '{}' not found.", identifier), node.start_token.clone());
+                                self.add_error_message(
+                                    &format!("Label '{}' not found.", identifier),
+                                    node.start_token.clone(),
+                                );
                                 new_tree.push(node.clone());
                             }
                         }
@@ -263,22 +303,27 @@ impl<'a> TreePass<'a> for ResolveLabelPass<'a> {
                     match argument {
                         &ParseArgument::Identifier(ref identifier) => {
                             if symbol_table.has_label(identifier) {
-
                                 let argument_size = self.system.label_size;
 
                                 let number = NumberLiteral {
                                     number: symbol_table.address_for(identifier),
-                                    argument_size: argument_size
+                                    argument_size: argument_size,
                                 };
 
                                 current_address += argument_size_to_byte_size(argument_size);
 
                                 new_tree.push(ParseNode {
                                     start_token: node.start_token.clone(),
-                                    expression: ParseExpression::IndirectLongInstruction(opcode_name.to_owned(), ParseArgument::NumberLiteral(number))
+                                    expression: ParseExpression::IndirectLongInstruction(
+                                        opcode_name.to_owned(),
+                                        ParseArgument::NumberLiteral(number),
+                                    ),
                                 });
                             } else {
-                                self.add_error_message(&format!("Label '{}' not found.", identifier), node.start_token.clone());
+                                self.add_error_message(
+                                    &format!("Label '{}' not found.", identifier),
+                                    node.start_token.clone(),
+                                );
                                 new_tree.push(node.clone());
                             }
                         }
@@ -291,7 +336,11 @@ impl<'a> TreePass<'a> for ResolveLabelPass<'a> {
                         }
                     }
                 }
-                ParseExpression::IndexedIndirectInstruction(ref opcode_name, ref argument1, ref argument2) => {
+                ParseExpression::IndexedIndirectInstruction(
+                    ref opcode_name,
+                    ref argument1,
+                    ref argument2,
+                ) => {
                     current_address += 1;
 
                     match argument1 {
@@ -301,30 +350,41 @@ impl<'a> TreePass<'a> for ResolveLabelPass<'a> {
 
                                 let number = NumberLiteral {
                                     number: symbol_table.address_for(identifier),
-                                    argument_size: argument_size
+                                    argument_size: argument_size,
                                 };
 
                                 current_address += argument_size_to_byte_size(argument_size);
 
                                 new_tree.push(ParseNode {
                                     start_token: node.start_token.clone(),
-                                    expression: ParseExpression::IndexedIndirectInstruction(opcode_name.to_owned(), ParseArgument::NumberLiteral(number), argument2.clone())
+                                    expression: ParseExpression::IndexedIndirectInstruction(
+                                        opcode_name.to_owned(),
+                                        ParseArgument::NumberLiteral(number),
+                                        argument2.clone(),
+                                    ),
                                 });
                             } else {
-                                self.add_error_message(&format!("Label '{}' not found.", identifier), node.start_token.clone());
+                                self.add_error_message(
+                                    &format!("Label '{}' not found.", identifier),
+                                    node.start_token.clone(),
+                                );
                                 new_tree.push(node.clone());
                             }
                         }
                         &ParseArgument::NumberLiteral(ref number) => {
                             current_address += argument_size_to_byte_size(number.argument_size);
-                             new_tree.push(node.clone());
+                            new_tree.push(node.clone());
                         }
                         _ => {
-                             new_tree.push(node.clone());
+                            new_tree.push(node.clone());
                         }
                     };
                 }
-                ParseExpression::IndirectIndexedInstruction(ref opcode_name, ref argument1, ref argument2) => {
+                ParseExpression::IndirectIndexedInstruction(
+                    ref opcode_name,
+                    ref argument1,
+                    ref argument2,
+                ) => {
                     current_address += 1;
 
                     match argument1 {
@@ -334,30 +394,41 @@ impl<'a> TreePass<'a> for ResolveLabelPass<'a> {
 
                                 let number = NumberLiteral {
                                     number: symbol_table.address_for(identifier),
-                                    argument_size: argument_size
+                                    argument_size: argument_size,
                                 };
 
                                 current_address += argument_size_to_byte_size(argument_size);
 
                                 new_tree.push(ParseNode {
                                     start_token: node.start_token.clone(),
-                                    expression: ParseExpression::IndirectIndexedInstruction(opcode_name.to_owned(), ParseArgument::NumberLiteral(number), argument2.clone())
+                                    expression: ParseExpression::IndirectIndexedInstruction(
+                                        opcode_name.to_owned(),
+                                        ParseArgument::NumberLiteral(number),
+                                        argument2.clone(),
+                                    ),
                                 });
                             } else {
-                                self.add_error_message(&format!("Label '{}' not found.", identifier), node.start_token.clone());
+                                self.add_error_message(
+                                    &format!("Label '{}' not found.", identifier),
+                                    node.start_token.clone(),
+                                );
                                 new_tree.push(node.clone());
                             }
                         }
                         &ParseArgument::NumberLiteral(ref number) => {
                             current_address += argument_size_to_byte_size(number.argument_size);
-                             new_tree.push(node.clone());
+                            new_tree.push(node.clone());
                         }
                         _ => {
-                             new_tree.push(node.clone());
+                            new_tree.push(node.clone());
                         }
                     };
                 }
-                ParseExpression::IndirectIndexedLongInstruction(ref opcode_name, ref argument1, ref argument2) => {
+                ParseExpression::IndirectIndexedLongInstruction(
+                    ref opcode_name,
+                    ref argument1,
+                    ref argument2,
+                ) => {
                     current_address += 1;
 
                     match argument1 {
@@ -367,26 +438,33 @@ impl<'a> TreePass<'a> for ResolveLabelPass<'a> {
 
                                 let number = NumberLiteral {
                                     number: symbol_table.address_for(identifier),
-                                    argument_size: argument_size
+                                    argument_size: argument_size,
                                 };
 
                                 current_address += argument_size_to_byte_size(argument_size);
 
                                 new_tree.push(ParseNode {
                                     start_token: node.start_token.clone(),
-                                    expression: ParseExpression::IndirectIndexedLongInstruction(opcode_name.to_owned(), ParseArgument::NumberLiteral(number), argument2.clone())
+                                    expression: ParseExpression::IndirectIndexedLongInstruction(
+                                        opcode_name.to_owned(),
+                                        ParseArgument::NumberLiteral(number),
+                                        argument2.clone(),
+                                    ),
                                 });
                             } else {
-                                self.add_error_message(&format!("Label '{}' not found.", identifier), node.start_token.clone());
+                                self.add_error_message(
+                                    &format!("Label '{}' not found.", identifier),
+                                    node.start_token.clone(),
+                                );
                                 new_tree.push(node.clone());
                             }
                         }
                         &ParseArgument::NumberLiteral(ref number) => {
                             current_address += argument_size_to_byte_size(number.argument_size);
-                             new_tree.push(node.clone());
+                            new_tree.push(node.clone());
                         }
                         _ => {
-                             new_tree.push(node.clone());
+                            new_tree.push(node.clone());
                         }
                     };
                 }
@@ -408,7 +486,12 @@ impl<'a> TreePass<'a> for ResolveLabelPass<'a> {
                         _ => {}
                     };
                 }
-                ParseExpression::StackRelativeIndirectIndexedInstruction(ref opcode_name, ref argument1, ref argument2, ref argument3) => {
+                ParseExpression::StackRelativeIndirectIndexedInstruction(
+                    ref opcode_name,
+                    ref argument1,
+                    ref argument2,
+                    ref argument3,
+                ) => {
                     current_address += 1;
 
                     match argument1 {
@@ -418,26 +501,35 @@ impl<'a> TreePass<'a> for ResolveLabelPass<'a> {
 
                                 let number = NumberLiteral {
                                     number: symbol_table.address_for(identifier),
-                                    argument_size: argument_size
+                                    argument_size: argument_size,
                                 };
 
                                 current_address += argument_size_to_byte_size(argument_size);
 
                                 new_tree.push(ParseNode {
                                     start_token: node.start_token.clone(),
-                                    expression: ParseExpression::StackRelativeIndirectIndexedInstruction(opcode_name.to_owned(), ParseArgument::NumberLiteral(number), argument2.clone(), argument3.clone())
+                                    expression:
+                                        ParseExpression::StackRelativeIndirectIndexedInstruction(
+                                            opcode_name.to_owned(),
+                                            ParseArgument::NumberLiteral(number),
+                                            argument2.clone(),
+                                            argument3.clone(),
+                                        ),
                                 });
                             } else {
-                                self.add_error_message(&format!("Label '{}' not found.", identifier), node.start_token.clone());
+                                self.add_error_message(
+                                    &format!("Label '{}' not found.", identifier),
+                                    node.start_token.clone(),
+                                );
                                 new_tree.push(node.clone());
                             }
                         }
                         &ParseArgument::NumberLiteral(ref number) => {
                             current_address += argument_size_to_byte_size(number.argument_size);
-                             new_tree.push(node.clone());
+                            new_tree.push(node.clone());
                         }
                         _ => {
-                             new_tree.push(node.clone());
+                            new_tree.push(node.clone());
                         }
                     };
                 }

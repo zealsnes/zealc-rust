@@ -1,4 +1,4 @@
-use std::fs;
+use std::fs::{metadata};
 use std::path::{Path, PathBuf};
 use zeal::lexer::*;
 use zeal::system_definition::*;
@@ -44,8 +44,8 @@ pub enum ParseExpression {
 }
 
 #[derive(Clone)]
-pub struct ParseNode<'a> {
-    pub start_token: Token<'a>,
+pub struct ParseNode {
+    pub start_token: Token,
     pub expression: ParseExpression,
 }
 
@@ -55,15 +55,17 @@ pub enum ErrorSeverity {
     Warning,
 }
 
-pub struct ErrorMessage<'a> {
+pub struct ErrorMessage {
     pub message: String,
-    pub token: Token<'a>,
+    pub token: Token,
     pub severity: ErrorSeverity,
 }
 
-pub struct Parser<'a> {
-    lexers: Vec<Lexer<'a>>,
-    pub error_messages: Vec<ErrorMessage<'a>>,
+pub struct Parser {
+    system: &'static SystemDefinition,
+    lexers: Vec<Lexer>,
+    current_lexer: i32,
+    pub error_messages: Vec<ErrorMessage>,
 }
 
 enum ParseResult<T> {
@@ -73,22 +75,34 @@ enum ParseResult<T> {
     Some(T),
 }
 
-impl<'a> Parser<'a> {
-    pub fn new(lexer: Lexer<'a>) -> Self {
-        let mut lexers = Vec::new();
-        lexers.push(lexer);
-
+impl Parser {
+    pub fn new(system: &'static SystemDefinition) -> Self {
         Parser {
-            lexers: lexers,
+            system: system,
+            lexers: Vec::new(),
             error_messages: Vec::new(),
+            current_lexer: -1,
         }
+    }
+
+    pub fn set_current_input_file(&mut self, filename: &str) {
+        for index in 0..self.lexers.len() {
+            if self.lexers[index].source_file == filename {
+                self.current_lexer = index as i32;
+                self.lexers[index].reset();
+                return;
+            }
+        }
+
+        self.lexers.push(Lexer::from_file(self.system, filename));
+        self.current_lexer = (self.lexers.len() - 1) as i32;
     }
 
     pub fn has_errors(&self) -> bool {
         return !self.error_messages.is_empty();
     }
 
-    pub fn parse_tree(&mut self) -> Vec<ParseNode<'a>> {
+    pub fn parse_tree(&mut self) -> Vec<ParseNode> {
         let mut parsed_tree = Vec::new();
 
         loop {
@@ -97,7 +111,10 @@ impl<'a> Parser<'a> {
                 ParseResult::None => continue,
                 ParseResult::Error => continue,
                 ParseResult::Done => {
-                    break
+                    self.current_lexer -= 1;
+                    if self.current_lexer < 0 {
+                        break
+                    }
                 }
             }
         }
@@ -105,14 +122,17 @@ impl<'a> Parser<'a> {
         return parsed_tree;
     }
 
-    // root : (cpuInstruction | label | origin_statement | snesmap_statement | incbin_statement)*;
-    fn parse(&mut self) -> ParseResult<ParseNode<'a>> {
+    // root : (cpuInstruction | label | origin_statement | snesmap_statement | incbin_statement | include_statement)*;
+    fn parse(&mut self) -> ParseResult<ParseNode> {
         let token = self.get_next_token();
         match token.ttype {
             TokenType::EndOfFile => return ParseResult::Done,
             TokenType::Opcode(ref opcode_name) => self.parse_cpu_instruction(&token, opcode_name),
             TokenType::Identifier(ref label_name) => {
                 self.parse_label(&token, label_name)
+            }
+            TokenType::KeywordInclude => {
+                self.parse_include(&token)
             }
             TokenType::KeywordIncbin => {
                 self.parse_incbin(&token)
@@ -147,9 +167,9 @@ impl<'a> Parser<'a> {
     //    ;
     fn parse_cpu_instruction(
         &mut self,
-        opcode_token: &Token<'a>,
+        opcode_token: &Token,
         opcode_name: &str,
-    ) -> ParseResult<ParseNode<'a>> {
+    ) -> ParseResult<ParseNode> {
         let lookahead = self.lookahead(1);
 
         if lookahead.ttype == TokenType::Immediate {
@@ -256,9 +276,9 @@ impl<'a> Parser<'a> {
 
     fn parse_immediate(
         &mut self,
-        opcode_token: &Token<'a>,
+        opcode_token: &Token,
         opcode_name: &str,
-    ) -> ParseResult<ParseNode<'a>> {
+    ) -> ParseResult<ParseNode> {
         self.get_next_token();
 
         let argument = self.parse_argument();
@@ -292,9 +312,9 @@ impl<'a> Parser<'a> {
 
     fn parse_indirect(
         &mut self,
-        opcode_token: &Token<'a>,
+        opcode_token: &Token,
         opcode_name: &str,
-    ) -> ParseResult<ParseNode<'a>> {
+    ) -> ParseResult<ParseNode> {
         let left_paren = self.get_next_token(); // Eat left parenthesis
 
         let argument = self.parse_argument();
@@ -433,9 +453,9 @@ impl<'a> Parser<'a> {
 
     fn parse_indirect_long(
         &mut self,
-        opcode_token: &Token<'a>,
+        opcode_token: &Token,
         opcode_name: &str,
-    ) -> ParseResult<ParseNode<'a>> {
+    ) -> ParseResult<ParseNode> {
         let left_bracket = self.get_next_token(); // Eat left bracket
 
         let argument = self.parse_argument();
@@ -548,7 +568,7 @@ impl<'a> Parser<'a> {
     }
 
     // label : IDENTIFIER ':'
-    fn parse_label(&mut self, label_token: &Token<'a>, label_name: &str) -> ParseResult<ParseNode<'a>> {
+    fn parse_label(&mut self, label_token: &Token, label_name: &str) -> ParseResult<ParseNode> {
         let lookahead = self.lookahead(1);
 
         if lookahead.ttype == TokenType::Colon {
@@ -564,7 +584,7 @@ impl<'a> Parser<'a> {
     }
 
     // origin_statement: 'origin' NUMBER_LITERAL
-    fn parse_origin_statement(&mut self, origin_token: &Token<'a>) -> ParseResult<ParseNode<'a>> {
+    fn parse_origin_statement(&mut self, origin_token: &Token) -> ParseResult<ParseNode> {
         let lookahead = self.lookahead(1);
 
         match lookahead.ttype {
@@ -589,7 +609,7 @@ impl<'a> Parser<'a> {
     }
 
     // snesmap_statement: 'snesmap' ('lorom'|'hirom')
-    fn parse_snesmap_statement(&mut self, origin_token: &Token<'a>) -> ParseResult<ParseNode<'a>> {
+    fn parse_snesmap_statement(&mut self, origin_token: &Token) -> ParseResult<ParseNode> {
         let lookahead = self.lookahead(1);
 
         match lookahead.ttype {
@@ -621,8 +641,47 @@ impl<'a> Parser<'a> {
         }
     }
 
+    // include_statement : 'include' STRING_LITERAL
+    fn parse_include(&mut self, origin_token: &Token) -> ParseResult<ParseNode> {
+        let lookahead = self.lookahead(1);
+
+        match lookahead.ttype {
+            TokenType::StringLiteral(filename) => {
+                let source_filename = self.lexer().unwrap().source_file.to_string();
+                let source_file_path = Path::new(&source_filename);
+                let mut include_path = PathBuf::new();
+                include_path.push(source_file_path.parent().unwrap());
+                include_path.push(&filename);
+
+                match metadata(&include_path) {
+                    Ok(_) => {
+                        self.get_next_token(); // eat string literal
+                        self.set_current_input_file(include_path.to_str().unwrap()); // Make the current lexer the included file
+
+                        ParseResult::None
+                    }
+                    _ => {
+                        self.get_next_token(); // eat string literal
+                        self.add_error_message(&format!("Couldn't open file '{}' for include statement", filename), origin_token.clone());
+                        ParseResult::Error
+                    }
+                }
+            }
+            TokenType::Invalid(invalid_token) => {
+                self.get_next_token(); // Eat token
+                self.add_invalid_token_message(invalid_token, lookahead);
+                ParseResult::Error
+            }
+            TokenType::EndOfFile => ParseResult::Done,
+            _ => {
+                self.add_error_message(&"Expected a string literal as argument to incbin", origin_token.clone());
+                ParseResult::Error
+            }
+        }
+    }
+
     // incbin_statement : 'incbin' STRING_LITERAL
-    fn parse_incbin(&mut self, origin_token: &Token<'a>) -> ParseResult<ParseNode<'a>> {
+    fn parse_incbin(&mut self, origin_token: &Token) -> ParseResult<ParseNode> {
         let lookahead = self.lookahead(1);
 
         match lookahead.ttype {
@@ -633,7 +692,7 @@ impl<'a> Parser<'a> {
                 incbin_path.push(source_file_path.parent().unwrap());
                 incbin_path.push(&filename);
 
-                match fs::metadata(&incbin_path) {
+                match metadata(&incbin_path) {
                     Ok(file_metadata) => {
                         self.get_next_token(); // eat string literal
                         let file_size = file_metadata.len();
@@ -672,19 +731,23 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn lookahead(&mut self, times: u32) -> Token<'a> {
+    fn lookahead(&mut self, times: u32) -> Token {
         self.lexer().unwrap().lookahead(times)
     }
 
-    fn get_next_token(&mut self) -> Token<'a> {
+    fn get_next_token(&mut self) -> Token {
         self.lexer().unwrap().get_next_token()
     }
 
-    fn lexer(&mut self) -> Option<&mut Lexer<'a>> {
-        self.lexers.last_mut()
+    fn lexer(&mut self) -> Option<&mut Lexer> {
+        if self.current_lexer >= 0 && self.current_lexer < (self.lexers.len() as i32) {
+            Some(&mut self.lexers[self.current_lexer as usize])
+        } else {
+            None
+        }
     }
 
-    fn add_error_message(&mut self, error_message: &str, offending_token: Token<'a>) {
+    fn add_error_message(&mut self, error_message: &str, offending_token: Token) {
         let new_message = ErrorMessage {
             message: error_message.to_owned(),
             token: offending_token,
@@ -694,7 +757,7 @@ impl<'a> Parser<'a> {
         self.error_messages.push(new_message);
     }
 
-    fn add_invalid_token_message(&mut self, invalid_token: char, token: Token<'a>) {
+    fn add_invalid_token_message(&mut self, invalid_token: char, token: Token) {
         self.add_error_message(&format!("Invalid token '{}' found.", invalid_token), token);
     }
 }
