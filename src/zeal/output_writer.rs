@@ -28,11 +28,23 @@ fn map_snes_hirom(value: u32) -> u32 {
     value & 0x3FFFFF
 }
 
-impl<'a> OutputWriter {
-    pub fn new(system: &'static SystemDefinition, file_path: &Path) -> Self {
+pub struct OutputWriterOptions {
+    pub create_new: bool
+}
+
+impl OutputWriterOptions {
+    pub fn new() -> Self {
+        OutputWriterOptions {
+            create_new: true,
+        }
+    }
+}
+
+impl OutputWriter {
+    pub fn new(system: &'static SystemDefinition, file_path: &Path, output_options: &OutputWriterOptions) -> Self {
         let mut file_options = OpenOptions::new();
         file_options.write(true);
-        file_options.create_new(true);
+        file_options.create_new(output_options.create_new);
 
         let file = match file_options.open(file_path) {
             Ok(file) => file,

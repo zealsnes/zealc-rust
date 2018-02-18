@@ -128,6 +128,12 @@ fn main() {
                 .takes_value(true),
         )
         .arg(
+            Arg::with_name("patch")
+                .short("p")
+                .long("patch")
+                .help("Put the compiler in patching mode. The compiler will only modifiy the relevant parts of the output.")
+        )
+        .arg(
             Arg::with_name("listcpu")
                 .long("list-cpu")
                 .help("List available CPU types."),
@@ -190,6 +196,9 @@ fn main() {
         }
     }
 
-    let mut output_writer = OutputWriter::new(selected_cpu, output_path);
+    let mut output_options = OutputWriterOptions::new();
+    output_options.create_new = !cmd_matches.is_present("patch");
+
+    let mut output_writer = OutputWriter::new(selected_cpu, output_path, &output_options);
     output_writer.write(&parse_tree);
 }
